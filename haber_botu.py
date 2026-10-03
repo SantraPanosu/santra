@@ -88,7 +88,9 @@ def resim_olustur(ai_veri, gorsel_url):
             f.write(html)
             
         print("Ekran görüntüsü alınıyor...")
-        resim_yolu = "santra_haber.jpg"
+        # Dosyanın tam ana dizine kaydedilmesini garantiliyoruz
+        resim_yolu = os.path.join(os.getcwd(), "santra_haber.jpg")
+        
         with sync_playwright() as p:
             browser = p.chromium.launch()
             page = browser.new_page(set_viewport_size={"width": 1080, "height": 1080})
@@ -97,7 +99,7 @@ def resim_olustur(ai_veri, gorsel_url):
             browser.close()
             
         print(f"BAŞARILI: {resim_yolu} oluşturuldu.")
-        return resim_yolu
+        return "santra_haber.jpg"
     except Exception as e:
         print(f"Resim Oluşturma Hatası: {e}")
         return None
