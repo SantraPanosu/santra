@@ -1,10 +1,10 @@
 import os
 import random
 import re
+import json
+import subprocess
 import feedparser
 import google.generativeai as genai
-import json
-import traceback
 from playwright.sync_api import sync_playwright
 from instagrapi import Client
 
@@ -21,7 +21,7 @@ if not GEMINI_API_KEY:
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-3.8-flash')
 
-# Haber Kaynakları Havuzu
+# Tüm Haber Kaynakları Havuzu
 RSS_KAYNAKLARI = [
     "https://www.fanatik.com.tr/rss/anasayfa",
     "https://www.fotomac.com.tr/rss/anasayfa.xml",
@@ -40,7 +40,6 @@ RSS_KAYNAKLARI = [
     "https://www.yenisafak.com/rss/spor"
 ]
 
-# Görsel bulunamadığında kullanılacak yüksek kaliteli futbol arka plan havuzu
 YEDEK_GORSELLER = [
     "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=1080",
     "https://images.unsplash.com/photo-1518605368461-1e1e12db801b?q=80&w=1080",
@@ -49,42 +48,84 @@ YEDEK_GORSELLER = [
     "https://images.unsplash.com/photo-1556056504-5c7696c4c28d?q=80&w=1080"
 ]
 
-def haberleri_cek():
-    secilen_rss = random.choice(RSS_KAYNAKLARI)
-    print(f"Seçilen Kaynak: {secilen_rss}")
+HAFIZA_DOSYASI = "paylasilanlar.json"
+
+def gecmisi_yukle():
+    if os.path.exists(HAFIZA_DOSYASI):
+        with open(HAFIZA_DOSYASI, "r", encoding="utf-8") as f:
+            try:
+                return json.load(f)
+            except:
+                return []
+    return []
+
+def gecmiye_kaydet(baslik):
+    paylasilanlar = gecmisi_yukle()
+    paylasilanlar.append(baslik)
+    if len(paylasilanlar) > 150:
+        paylasilanlar = paylasilanlar[-150:]
+    with open(HAFIZA_DOSYASI, "w", encoding="utf-8") as f:
+        json.dump(paylasilanlar, f, ensure_ascii=False, indent=4)
     
-    feed = feedparser.parse(secilen_rss)
-    if not feed.entries:
-        print(f"UYARI: {secilen_rss} kaynağından haber alınamadı...")
+    try:
+        subprocess.run(["git", "config", "--global", "user.name", "SantraBot"], check=True)
+        subprocess.run(["git", "config", "--global", "user.email", "bot@santrapanosu.com"], check=True)
+        subprocess.run(["git", "add", HAFIZA_DOSYASI], check=True)
+        subprocess.run(["git", "commit", "-m", "Yeni haber paylasildi, hafiza guncellendi [skip ci]"], check=True)
+        subprocess.run(["git", "push"], check=True)
+        print("Hafıza GitHub deposuna kaydedildi.")
+    except Exception as e:
+        print(f"Git kayıt uyarısı (Lokal testlerde normaldir): {e}")
+
+def haberleri_cek():
+    paylasilanlar = gecmisi_yukle()
+    toplanan_yeni_haberler = []
+    
+    # Hepsini tek tek tarıyoruz
+    for secilen_rss in RSS_KAYNAKLARI:
+        print(f"Taranıyor: {secilen_rss}")
+        try:
+            feed = feedparser.parse(secilen_rss)
+            if not feed.entries:
+                continue
+                
+            # Her kaynağın son 5 haberini incele
+            for entry in feed.entries[:5]:
+                baslik = entry.title
+                if baslik not in paylasilanlar:
+                    gorsel_url = random.choice(YEDEK_GORSELLER)
+                    if 'media_content' in entry:
+                        gorsel_url = entry.media_content[0]['url']
+                    elif 'enclosures' in entry and len(entry.enclosures) > 0:
+                        gorsel_url = entry.enclosures[0]['href']
+                    elif 'links' in entry:
+                        for link in entry.links:
+                            if 'image' in link.get('type', ''):
+                                gorsel_url = link.href
+                                break
+                                
+                    aciklama_metni = entry.get('description', '')
+                    if not gorsel_url or gorsel_url in YEDEK_GORSELLER:
+                        img_match = re.search(r'src=["\'](https?://[^"\']+\.(?:jpg|jpeg|png|webp))["\']', aciklama_metni, re.IGNORECASE)
+                        if img_match:
+                            gorsel_url = img_match.group(1)
+                    
+                    toplanan_yeni_haberler.append({
+                        'orjinal_baslik': baslik,
+                        'orjinal_metin': aciklama_metni,
+                        'gorsel_url': gorsel_url
+                    })
+        except Exception as e:
+            print(f"Kaynak taranırken hata oluştu ({secilen_rss}): {e}")
+            
+    if not toplanan_yeni_haberler:
+        print("UYARI: Tüm kaynaklar tarandı ancak yeni haber bulunamadı!")
         return None
         
-    en_yeni_haber = feed.entries[0]
-    gorsel_url = random.choice(YEDEK_GORSELLER)
-    
-    # 1. RSS medya alanlarını kontrol et
-    if 'media_content' in en_yeni_haber:
-        gorsel_url = en_yeni_haber.media_content[0]['url']
-    elif 'enclosures' in en_yeni_haber and len(en_yeni_haber.enclosures) > 0:
-        gorsel_url = en_yeni_haber.enclosures[0]['href']
-    elif 'links' in en_yeni_haber:
-        for link in en_yeni_haber.links:
-            if 'image' in link.get('type', ''):
-                gorsel_url = link.href
-                break
-                
-    # 2. İçerik metni içindeki resmi kontrol et
-    aciklama_metni = en_yeni_haber.get('description', '')
-    if not gorsel_url or gorsel_url in YEDEK_GORSELLER:
-        img_match = re.search(r'src=["\'](https?://[^"\']+\.(?:jpg|jpeg|png|webp))["\']', aciklama_metni, re.IGNORECASE)
-        if img_match:
-            gorsel_url = img_match.group(1)
-    
-    print(f"Haber çekildi: {en_yeni_haber.title} | Görsel: {gorsel_url}")
-    return {
-        'orjinal_baslik': en_yeni_haber.title,
-        'orjinal_metin': aciklama_metni,
-        'gorsel_url': gorsel_url
-    }
+    # Toplanan tüm yeni haberler arasından rastgele veya en tazesini seçiyoruz
+    secilen_haber = random.choice(toplanan_yeni_haberler)
+    print(f"SEÇİLEN TAZE HABER: {secilen_haber['orjinal_baslik']}")
+    return secilen_haber
 
 def yapay_zeka_ile_ozgunlestir(haber_verisi):
     print("Yapay zeka devrede, bülten hazırlanıyor...")
@@ -131,10 +172,7 @@ def resim_olustur(ai_veri, gorsel_url):
         browser = p.chromium.launch(args=["--no-sandbox", "--disable-setuid-sandbox"])
         page = browser.new_page()
         page.set_viewport_size({"width": 1080, "height": 1080})
-        
-        # KRİTİK DÜZELTME: Görselin tamamen yüklenmesini bekleyip öyle ekran görüntüsü alıyoruz
         page.goto(f"file://{os.path.abspath('gecici.html')}", wait_until="networkidle")
-        
         page.locator(".card").screenshot(path=resim_yolu, type="jpeg", quality=90)
         browser.close()
         
@@ -167,17 +205,13 @@ def instagrama_yukle(resim_yolu, ai_veri):
         print(f"Instagram Paylaşım Hatası: {e}")
 
 if __name__ == "__main__":
-    haber = None
-    for _ in range(5):
-        haber = haberleri_cek()
-        if haber:
-            break
-            
+    haber = haberleri_cek()
     if haber:
         islenmis = yapay_zeka_ile_ozgunlestir(haber)
         if islenmis:
             resim_dosyasi = resim_olustur(islenmis, haber['gorsel_url'])
             instagrama_yukle(resim_dosyasi, islenmis)
+            gecmiye_kaydet(haber['orjinal_baslik'])
             print("Süreç tamamen tamamlandı!")
     else:
-        print("HATA: Hiçbir kaynaktan haber alınamadı.")
+        print("HATA: Paylaşılacak yeni haber bulunamadı.")
