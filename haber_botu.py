@@ -40,7 +40,7 @@ RSS_KAYNAKLARI = [
     "https://www.yenisafak.com/rss/spor"
 ]
 
-# Görsel bulunamadığında kullanılacak yüksek kaliteli futbol/stadyum arka plan havuzu
+# Görsel bulunamadığında kullanılacak yüksek kaliteli futbol arka plan havuzu
 YEDEK_GORSELLER = [
     "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=1080",
     "https://images.unsplash.com/photo-1518605368461-1e1e12db801b?q=80&w=1080",
@@ -55,15 +55,13 @@ def haberleri_cek():
     
     feed = feedparser.parse(secilen_rss)
     if not feed.entries:
-        print(f"UYARI: {secilen_rss} kaynağından haber alınamadı, başka bir kaynağa bakılıyor...")
+        print(f"UYARI: {secilen_rss} kaynağından haber alınamadı...")
         return None
         
     en_yeni_haber = feed.entries[0]
-    
-    # Varsayılan olarak yedek havuzdan rastgele bir spor görseli atıyoruz
     gorsel_url = random.choice(YEDEK_GORSELLER)
     
-    # 1. Yöntem: Standart RSS media veya enclosure alanlarına bak
+    # 1. RSS medya alanlarını kontrol et
     if 'media_content' in en_yeni_haber:
         gorsel_url = en_yeni_haber.media_content[0]['url']
     elif 'enclosures' in en_yeni_haber and len(en_yeni_haber.enclosures) > 0:
@@ -74,14 +72,14 @@ def haberleri_cek():
                 gorsel_url = link.href
                 break
                 
-    # 2. Yöntem: Eğer yukarıdakiler boşsa, haber metninin içindeki HTML img etiketini ara
+    # 2. İçerik metni içindeki resmi kontrol et
     aciklama_metni = en_yeni_haber.get('description', '')
     if not gorsel_url or gorsel_url in YEDEK_GORSELLER:
         img_match = re.search(r'src=["\'](https?://[^"\']+\.(?:jpg|jpeg|png|webp))["\']', aciklama_metni, re.IGNORECASE)
         if img_match:
             gorsel_url = img_match.group(1)
     
-    print(f"Haber çekildi: {en_yeni_haber.title} | Kullanılan Görsel: {gorsel_url}")
+    print(f"Haber çekildi: {en_yeni_haber.title} | Görsel: {gorsel_url}")
     return {
         'orjinal_baslik': en_yeni_haber.title,
         'orjinal_metin': aciklama_metni,
@@ -89,15 +87,14 @@ def haberleri_cek():
     }
 
 def yapay_zeka_ile_ozgunlestir(haber_verisi):
-    print("Yapay zeka devrede, kapsamlı haber bülteni hazırlanıyor...")
+    print("Yapay zeka devrede, bülten hazırlanıyor...")
     prompt = f"""
-    Aşağıdaki spor haberini ve içeriğini dikkatlice incele. Okuyucunun başka hiçbir siteye gitmesine gerek kalmayacak şekilde, olayın tüm detaylarını, arka planını ve gelişmelerini açıklayan eksiksiz bir Instagram metni oluştur.
-    
+    Aşağıdaki spor haberini incele ve Instagram için profesyonel bir içerik üret.
     Senden 4 şey istiyorum ve çıktıyı KESİNLİKLE sadece aşağıdaki JSON formatında ver:
     1. "baslik": Görsel üzerine yazılacak çarpıcı ve büyük ana başlık.
     2. "ozet": Görselde yer alacak 1 cümlelik vurucu özet.
     3. "aciklama": Görselde yer alacak 2-3 cümlelik kısa kart açıklaması.
-    4. "detayli_metin": Instagram açıklaması için; haberin tüm detaylarını, kimin ne dediğini, sürecin nasıl geliştiğini ve arka planını anlatan, en az 3-4 zengin paragraftan oluşan kapsamlı, profesyonel haber bülteni metni.
+    4. "detayli_metin": Instagram açıklaması için; haberin tüm detaylarını, arka planını ve analizini anlatan, en az 3-4 paragraftan oluşan profesyonel metin.
     
     JSON formatı dışında asla başka bir şey yazma:
     {{
@@ -115,7 +112,7 @@ def yapay_zeka_ile_ozgunlestir(haber_verisi):
     return json.loads(temiz_metin)
 
 def resim_olustur(ai_veri, gorsel_url):
-    print("Tasarım giydiriliyor ve dinamik arka plan işleniyor...")
+    print("Tasarım giydiriliyor ve arka plan görseli işleniyor...")
     with open("tasarim.html", "r", encoding="utf-8") as f:
         html = f.read()
         
@@ -134,11 +131,14 @@ def resim_olustur(ai_veri, gorsel_url):
         browser = p.chromium.launch(args=["--no-sandbox", "--disable-setuid-sandbox"])
         page = browser.new_page()
         page.set_viewport_size({"width": 1080, "height": 1080})
-        page.goto(f"file://{os.path.abspath('gecici.html')}")
+        
+        # KRİTİK DÜZELTME: Görselin tamamen yüklenmesini bekleyip öyle ekran görüntüsü alıyoruz
+        page.goto(f"file://{os.path.abspath('gecici.html')}", wait_until="networkidle")
+        
         page.locator(".card").screenshot(path=resim_yolu, type="jpeg", quality=90)
         browser.close()
         
-    print(f"BAŞARILI: {resil_yolu if 'resil_yolu' in locals() else resim_yolu} oluşturuldu.")
+    print(f"BAŞARILI: {resim_yolu} oluşturuldu.")
     return resim_yolu
 
 def instagrama_yukle(resim_yolu, ai_veri):
@@ -162,7 +162,7 @@ def instagrama_yukle(resim_yolu, ai_veri):
         )
         
         cl.photo_upload(resim_yolu, caption)
-        print("BAŞARILI: Gönderi Keşfet odaklı açıklamasıyla yayınlandı! ✅")
+        print("BAŞARILI: Gönderi başarıyla yayınlandı! ✅")
     except Exception as e:
         print(f"Instagram Paylaşım Hatası: {e}")
 
