@@ -3,23 +3,21 @@ import random
 import re
 import json
 import subprocess
+import time
 import feedparser
-import google.generativeai as genai
+from groq import Groq
 from playwright.sync_api import sync_playwright
-from instagrapi import Client
 
-# --- KENDİ INSTAGRAM BİLGİLERİNİ BURAYA YAZ ---
-IG_USERNAME = "KULLANICI_ADIN"
-IG_PASSWORD = "SIFREN"
-# ----------------------------------------------
+# --- KENDİ BİLGİLERİNİ BURAYA YAZ ---
+IG_USERNAME = "santrapanosu"
+IG_PASSWORD = "Santra@1357"
+GROQ_API_KEY = "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"
+# ------------------------------------
 
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+if not GROQ_API_KEY or GROQ_API_KEY == "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":
+    raise ValueError("HATA: GROQ_API_KEY girilmedi!")
 
-if not GEMINI_API_KEY:
-    raise ValueError("HATA: GEMINI_API_KEY bulunamadı!")
-
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-3.8-flash')
+client = Groq(api_key=GROQ_API_KEY)
 
 # Tüm Haber Kaynakları Havuzu
 RSS_KAYNAKLARI = [
@@ -71,17 +69,16 @@ def gecmiye_kaydet(baslik):
         subprocess.run(["git", "config", "--global", "user.name", "SantraBot"], check=True)
         subprocess.run(["git", "config", "--global", "user.email", "bot@santrapanosu.com"], check=True)
         subprocess.run(["git", "add", HAFIZA_DOSYASI], check=True)
-        subprocess.run(["git", "commit", "-m", "Yeni haber paylasildi, hafiza guncellendi [skip ci]"], check=True)
+        subprocess.run(["git", "commit", "-m", "Hafiza guncellendi [skip ci]"], check=True)
         subprocess.run(["git", "push"], check=True)
         print("Hafıza GitHub deposuna kaydedildi.")
     except Exception as e:
-        print(f"Git kayıt uyarısı (Lokal testlerde normaldir): {e}")
+        print(f"Git kayıt uyarısı: {e}")
 
 def haberleri_cek():
     paylasilanlar = gecmisi_yukle()
     toplanan_yeni_haberler = []
     
-    # Hepsini tek tek tarıyoruz
     for secilen_rss in RSS_KAYNAKLARI:
         print(f"Taranıyor: {secilen_rss}")
         try:
@@ -89,7 +86,6 @@ def haberleri_cek():
             if not feed.entries:
                 continue
                 
-            # Her kaynağın son 5 haberini incele
             for entry in feed.entries[:5]:
                 baslik = entry.title
                 if baslik not in paylasilanlar:
@@ -116,44 +112,43 @@ def haberleri_cek():
                         'gorsel_url': gorsel_url
                     })
         except Exception as e:
-            print(f"Kaynak taranırken hata oluştu ({secilen_rss}): {e}")
+            print(f"Kaynak taranırken hata: {e}")
             
     if not toplanan_yeni_haberler:
-        print("UYARI: Tüm kaynaklar tarandı ancak yeni haber bulunamadı!")
+        print("UYARI: Yeni haber bulunamadı!")
         return None
         
-    # Toplanan tüm yeni haberler arasından rastgele veya en tazesini seçiyoruz
     secilen_haber = random.choice(toplanan_yeni_haberler)
     print(f"SEÇİLEN TAZE HABER: {secilen_haber['orjinal_baslik']}")
     return secilen_haber
 
 def yapay_zeka_ile_ozgunlestir(haber_verisi):
-    print("Yapay zeka devrede, bülten hazırlanıyor...")
+    print("Groq yapay zeka devrede, bülten hazırlanıyor...")
     prompt = f"""
     Aşağıdaki spor haberini incele ve Instagram için profesyonel bir içerik üret.
-    Senden 4 şey istiyorum ve çıktıyı KESİNLİKLE sadece aşağıdaki JSON formatında ver:
-    1. "baslik": Görsel üzerine yazılacak çarpıcı ve büyük ana başlık.
-    2. "ozet": Görselde yer alacak 1 cümlelik vurucu özet.
-    3. "aciklama": Görselde yer alacak 2-3 cümlelik kısa kart açıklaması.
-    4. "detayli_metin": Instagram açıklaması için; haberin tüm detaylarını, arka planını ve analizini anlatan, en az 3-4 paragraftan oluşan profesyonel metin.
-    
-    JSON formatı dışında asla başka bir şey yazma:
+    Senden 4 şey istiyorum ve çıktıyı KESİNLİKLE sadece şu JSON formatında ver, başka hiçbir şey yazma:
     {{
-        "baslik": "...",
-        "ozet": "...",
-        "aciklama": "...",
-        "detayli_metin": "..."
+        "baslik": "Görsel üzerine yazılacak çarpıcı ve büyük ana başlık",
+        "ozet": "Görselde yer alacak 1 cümlelik vurucu özet",
+        "aciklama": "Görselde yer alacak 2-3 cümlelik kısa kart açıklaması",
+        "detayli_metin": "Instagram açıklaması için; haberin tüm detaylarını, arka planını ve analizini anlatan, en az 3-4 paragraftan oluşan profesyonel metin."
     }}
     
     Haber Başlığı: {haber_verisi['orjinal_baslik']}
     Haber İçeriği: {haber_verisi['orjinal_metin']}
     """
-    response = model.generate_content(prompt)
-    temiz_metin = response.text.replace('```json', '').replace('```', '').strip()
+    
+    chat_completion = client.chat.completions.create(
+        messages=[{"role": "user", "content": prompt}],
+        model="llama-3.3-70b-versatile",
+    )
+    
+    cevap = chat_completion.choices[0].message.content
+    temiz_metin = cevap.replace('```json', '').replace('```', '').strip()
     return json.loads(temiz_metin)
 
 def resim_olustur(ai_veri, gorsel_url):
-    print("Tasarım giydiriliyor ve arka plan görseli işleniyor...")
+    print("Tasarım giydiriliyor...")
     with open("tasarim.html", "r", encoding="utf-8") as f:
         html = f.read()
         
@@ -165,9 +160,7 @@ def resim_olustur(ai_veri, gorsel_url):
     with open("gecici.html", "w", encoding="utf-8") as f:
         f.write(html)
         
-    print("Ekran görüntüsü alınıyor...")
     resim_yolu = os.path.join(os.getcwd(), "santra_haber.jpg")
-    
     with sync_playwright() as p:
         browser = p.chromium.launch(args=["--no-sandbox", "--disable-setuid-sandbox"])
         page = browser.new_page()
@@ -179,30 +172,100 @@ def resim_olustur(ai_veri, gorsel_url):
     print(f"BAŞARILI: {resim_yolu} oluşturuldu.")
     return resim_yolu
 
-def instagrama_yukle(resim_yolu, ai_veri):
-    print("Instagram'a otomatik bağlanılıyor...")
-    try:
-        cl = Client()
-        cl.login(IG_USERNAME, IG_PASSWORD)
+def instagrama_yukle_guvenli(resim_yolu, ai_veri):
+    print("Instagram web arayüzü ile ban riski olmadan güvenli paylaşım başlatılıyor...")
+    
+    hashtags = (
+        "#SantraPanosu #SporGündemi #Futbol #SüperLig #Transfer "
+        "#SonDakika #Galatasaray #Fenerbahçe #Beşiktaş #Trabzonspor "
+        "#MilliTakim #Maç #Keşfet #Explore #FootballNews #SporHaberleri"
+    )
+    
+    caption = (
+        f"🚨 {ai_veri['baslik']}\n\n"
+        f"{ai_veri['detayli_metin']}\n\n"
+        "📌 Bu tarz en güncel gelişmelerden anında haberdar olmak için gönderiyi beğenmeyi ve kaydetmeyi unutmayın!\n\n"
+        "👇 Sizce bu olay takımınızı nasıl etkiler? Yorumlarda buluşalım!\n\n"
+        f"{hashtags}"
+    )
+
+    with sync_playwright() as p:
+        # Tarayıcıyı gerçek kullanıcı profili gibi başlatıyoruz
+        browser = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"])
+        context = browser.new_context(viewport={"width": 1280, "height": 800})
+        page = context.new_page()
         
-        hashtags = (
-            "#SantraPanosu #SporGündemi #Futbol #SüperLig #Transfer "
-            "#SonDakika #Galatasaray #Fenerbahçe #Beşiktaş #Trabzonspor "
-            "#MilliTakim #Maç #Keşfet #Explore #FootballNews #SporHaberleri"
-        )
-        
-        caption = (
-            f"🚨 {ai_veri['baslik']}\n\n"
-            f"{ai_veri['detayli_metin']}\n\n"
-            "📌 Bu tarz en güncel gelişmelerden anında haberdar olmak için gönderiyi beğenmeyi ve kaydetmeyi unutmayın!\n\n"
-            "👇 Sizce bu olay takımınızı nasıl etkiler? Yorumlarda buluşalım!\n\n"
-            f"{hashtags}"
-        )
-        
-        cl.photo_upload(resim_yolu, caption)
-        print("BAŞARILI: Gönderi başarıyla yayınlandı! ✅")
-    except Exception as e:
-        print(f"Instagram Paylaşım Hatası: {e}")
+        try:
+            print("Instagram giriş sayfasına gidiliyor...")
+            page.goto("https://www.instagram.com/accounts/login/", timeout=60000)
+            time.sleep(5)
+            
+            # Çerezleri kabul et butonu çıkarsa basalım
+            try:
+                page.locator("button:has-text('Allow all cookies')").click(timeout=3000)
+            except:
+                pass
+
+            print("Kullanıcı bilgileri giriliyor...")
+            page.locator("input[name='username']").fill(IG_USERNAME)
+            page.locator("input[name='password']").fill(IG_PASSWORD)
+            page.locator("button[type='submit']").click()
+            
+            # Girişin tamamlanması için bekleyelim
+            print("Giriş yapılıyor, bekleniyor...")
+            time.sleep(10)
+            
+            # Bildirimleri kapat pencereleri çıkarsa geçelim
+            try:
+                page.locator("button:has-text('Not Now')").click(timeout=5000)
+            except:
+                pass
+            try:
+                page.locator("button:has-text('Şimdi Değil')").click(timeout=3000)
+            except:
+                pass
+
+            print("Ana sayfadayız, yeni gönderi oluşturuluyor...")
+            # Yeni gönderi oluşturma butonunu bulup tıklıyoruz (Artı ikonu)
+            # Alternatif olarak direkt web upload URL'sine yönlendiriyoruz
+            page.goto("https://www.instagram.com/create/style/", timeout=60000)
+            time.sleep(5)
+            
+            # Dosya yükleme alanını buluyoruz
+            print("Görsel yükleniyor...")
+            file_input = page.locator("input[type='file']")
+            file_input.set_input_files(resim_yolu)
+            time.sleep(5)
+            
+            # İleri butonlarına tıklama süreçleri
+            # (Not: Instagram web arayüzü güncellemelerine göre buton metinleri değişebilir, sırasıyla 'İleri' / 'Next' tıklanır)
+            for _ in range(3):
+                try:
+                    next_btn = page.locator("button:has-text('İleri'), button:has-text('Next')")
+                    if next_btn.is_visible():
+                        next_btn.click()
+                        time.sleep(3)
+                except:
+                    break
+
+            print("Açıklama metni ekleniyor...")
+            # Açıklama metni yazma alanını buluyoruz
+            textarea = page.locator("div[aria-label='Write a caption...'], div[aria-label='Bir açıklama yazın...'], textarea")
+            textarea.fill(caption)
+            time.sleep(3)
+
+            print("Paylaş butonuna basılıyor...")
+            share_btn = page.locator("button:has-text('Paylaş'), button:has-text('Share')")
+            share_btn.click()
+            
+            print("Yüklemenin tamamlanması bekleniyor...")
+            time.sleep(10)
+            print("BAŞARILI: Gönderi Instagram'da güvenli bir şekilde yayınlandı! ✅")
+            
+        except Exception as e:
+            print(f"Instagram Web Otomasyon Hatası: {e}")
+        finally:
+            browser.close()
 
 if __name__ == "__main__":
     haber = haberleri_cek()
@@ -210,7 +273,7 @@ if __name__ == "__main__":
         islenmis = yapay_zeka_ile_ozgunlestir(haber)
         if islenmis:
             resim_dosyasi = resim_olustur(islenmis, haber['gorsel_url'])
-            instagrama_yukle(resim_dosyasi, islenmis)
+            instagrama_yukle_guvenli(resim_dosyasi, islenmis)
             gecmiye_kaydet(haber['orjinal_baslik'])
             print("Süreç tamamen tamamlandı!")
     else:
