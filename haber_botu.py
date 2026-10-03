@@ -2,6 +2,7 @@ import os
 import feedparser
 import google.generativeai as genai
 import json
+import traceback
 from playwright.sync_api import sync_playwright
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
@@ -91,7 +92,6 @@ def resim_olustur(ai_veri, gorsel_url):
         resim_yolu = os.path.join(os.getcwd(), "santra_haber.jpg")
         
         with sync_playwright() as p:
-            # Linux sunucusunda çökmemesi için --no-sandbox argümanını ekledik!
             browser = p.chromium.launch(args=["--no-sandbox", "--disable-setuid-sandbox"])
             page = browser.new_page(set_viewport_size={"width": 1080, "height": 1080})
             page.goto(f"file://{os.path.abspath('gecici.html')}")
@@ -101,7 +101,8 @@ def resim_olustur(ai_veri, gorsel_url):
         print(f"BAŞARILI: {resim_yolu} oluşturuldu.")
         return "santra_haber.jpg"
     except Exception as e:
-        print(f"Resim Oluşturma Kritik Hatası: {e}")
+        print("KRİTİK HATA OLUŞTU:")
+        traceback.print_exc()
         return None
 
 if __name__ == "__main__":
