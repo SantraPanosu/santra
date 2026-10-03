@@ -1,40 +1,36 @@
-name: Haber Botu Otomasyonu
+name: Santra Panosu Otomatik Haber Botu
 
 on:
   schedule:
-    - cron: '*/30 * * * *'
-  workflow_dispatch:
+    # Her 4 saatte bir otomatik çalışır (istediğin gibi değiştirebilirsin)
+    - cron: '0 */4 * * *'
+  workflow_dispatch: # Manuel olarak 'Run workflow' diyerek test edebilmeni sağlar
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Depoyu kopyala
+    - name: Depoyu Kopyala (Checkout)
       uses: actions/checkout@v4
 
-    - name: Python'u kur
+    - name: Python Kurulumu
       uses: actions/setup-python@v5
       with:
-        python-version: '3.10'
+        python-version: '3.11'
 
-    - name: Gereksinimleri Yükle ve Tarayıcıyı Hazırla
+    - name: Bağımlılıkları Yükle
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        playwright install chromium
-        playwright install-deps chromium
 
-    - name: Botu Çalıştır
+    - name: Playwright Tarayıcılarını Yükle
+      run: playwright install chromium
+
+    - name: Botu Çalıştır ve Paylaşım Yap
       env:
-        GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
         IG_USERNAME: ${{ secrets.IG_USERNAME }}
         IG_PASSWORD: ${{ secrets.IG_PASSWORD }}
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       run: |
         python haber_botu.py
-
-    - name: Görseli Kaydet (İndirebilmen için)
-      uses: actions/upload-artifact@v4
-      with:
-        name: santra-haber-gorseli
-        path: santra_haber.jpg
