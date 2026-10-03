@@ -13,7 +13,6 @@ if not GEMINI_API_KEY:
     raise ValueError("HATA: GEMINI_API_KEY bulunamadı!")
 
 genai.configure(api_key=GEMINI_API_KEY)
-# Model adını hata mesajının önerdiği güncel sürüme güncelledik
 model = genai.GenerativeModel('gemini-3.8-flash')
 
 def haberleri_cek(rss_url):
@@ -82,7 +81,9 @@ def resim_olustur(ai_veri, gorsel_url):
     
     with sync_playwright() as p:
         browser = p.chromium.launch(args=["--no-sandbox", "--disable-setuid-sandbox"])
-        page = browser.new_page(set_viewport_size={"width": 1080, "height": 1080})
+        page = browser.new_page()
+        # Ekran boyutunu doğru yöntemle ayarlıyoruz
+        page.set_viewport_size({"width": 1080, "height": 1080})
         page.goto(f"file://{os.path.abspath('gecici.html')}")
         page.locator(".card").screenshot(path=resim_yolu, type="jpeg", quality=90)
         browser.close()
