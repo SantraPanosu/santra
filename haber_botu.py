@@ -139,12 +139,10 @@ def yapay_zeka_ile_ozgunlestir(haber_verisi):
     
     chat_completion = client.chat.completions.create(
         messages=[{"role": "user", "content": prompt}],
-        model="mixtral-8x7b-32768",  # Groq'un en sağlam, hatasız ve limitsiz modeli
+        model="llama-3.1-8b-instant",  # Güncel aktif model
     )
     
     cevap = chat_completion.choices[0].message.content
-    
-    # Çift tırnaklar ile kopyalama hatası riski tamamen ortadan kaldırıldı
     temiz_metin = cevap.replace("```json", "").replace("```", "").strip()
     return json.loads(temiz_metin)
 
