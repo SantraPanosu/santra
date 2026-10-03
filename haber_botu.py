@@ -139,7 +139,7 @@ def yapay_zeka_ile_ozgunlestir(haber_verisi):
     
     chat_completion = client.chat.completions.create(
         messages=[{"role": "user", "content": prompt}],
-        model="llama-3.1-8b-instant",  # Güncel aktif model
+        model="openai/gpt-oss-20b",  # Ücretsiz hesaplar için aktif ve yetkisi açık model!
     )
     
     cevap = chat_completion.choices[0].message.content
