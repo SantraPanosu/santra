@@ -61,12 +61,30 @@ def haberleri_cek():
 def ozgunlestir(haber):
     print("Yapay zeka devrede...")
     prompt = "Su spor haberini incele ve SADECE JSON ver: {\"baslik\":\"kisa baslik\",\"ozet\":\"1 cumle\",\"aciklama\":\"kisa\",\"detayli_metin\":\"uzun text\"}. Haber: " + haber['baslik'] + " - " + haber['metin']
-    chat = client.chat.completions.create(
-        messages=[{"role": "user", "content": prompt}],
-        model="llama-3.1-8b-instant" 
-    )
-    cevap = chat.choices[0].message.content.replace("```json", "").replace("```", "").strip()
-    return json.loads(cevap)
+    
+    # KESİN ÇÖZÜM: Modelleri sırayla deneyecek otomatik liste
+    modeller = [
+        "llama-3.2-3b-preview",
+        "gemma2-9b-it",
+        "llama-3.1-8b-instant",
+        "mixtral-8x7b-32768"
+    ]
+    
+    for model_adi in modeller:
+        try:
+            print(f"Deneniyor: {model_adi}")
+            chat = client.chat.completions.create(
+                messages=[{"role": "user", "content": prompt}],
+                model=model_adi
+            )
+            cevap = chat.choices[0].message.content.replace("```json", "").replace("```", "").strip()
+            print(f"Basarili model: {model_adi}")
+            return json.loads(cevap)
+        except Exception as e:
+            print(f"-> {model_adi} basarisiz oldu, siradakine geciliyor...")
+            continue
+            
+    raise Exception("HATA: Hicbir Groq modeli calismadi! Lutfen API Key'ini sifirdan yenile.")
 
 def resim_olustur(ai, gorsel):
     print("Tasarim hazirlaniyor...")
