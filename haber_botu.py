@@ -60,14 +60,13 @@ def haberleri_cek():
 
 def ozgunlestir(haber):
     print("Yapay zeka devrede...")
-    prompt = "Su spor haberini incele ve SADECE JSON ver: {\"baslik\":\"kisa baslik\",\"ozet\":\"1 cumle\",\"aciklama\":\"kisa\",\"detayli_metin\":\"uzun text\"}. Haber: " + haber['baslik'] + " - " + haber['metin']
+    prompt = "Su spor haberini incele ve SADECE JSON formatinda ver. Baska hicbir kelime yazma: {\"baslik\":\"kisa baslik\",\"ozet\":\"1 cumle\",\"aciklama\":\"kisa\",\"detayli_metin\":\"uzun text\"}. Haber: " + haber['baslik'] + " - " + haber['metin']
     
-    # KESİN ÇÖZÜM: Modelleri sırayla deneyecek otomatik liste
     modeller = [
-        "llama-3.2-3b-preview",
-        "gemma2-9b-it",
-        "llama-3.1-8b-instant",
-        "mixtral-8x7b-32768"
+        "llama3-8b-8192", 
+        "llama3-70b-8192", 
+        "mixtral-8x7b-32768",
+        "gemma-7b-it"
     ]
     
     for model_adi in modeller:
@@ -77,14 +76,22 @@ def ozgunlestir(haber):
                 messages=[{"role": "user", "content": prompt}],
                 model=model_adi
             )
-            cevap = chat.choices[0].message.content.replace("```json", "").replace("```", "").strip()
+            cevap = chat.choices[0].message.content
             print(f"Basarili model: {model_adi}")
-            return json.loads(cevap)
+            
+            # Yapay zeka fazladan metin yazarsa diye sadece { ... } arasini zorla cekiyoruz
+            json_match = re.search(r'\{.*?\}', cevap.replace('\n', ''), re.IGNORECASE | re.DOTALL)
+            if json_match:
+                temiz_metin = json_match.group(0)
+            else:
+                temiz_metin = cevap.replace("```json", "").replace("```", "").strip()
+                
+            return json.loads(temiz_metin)
         except Exception as e:
-            print(f"-> {model_adi} basarisiz oldu, siradakine geciliyor...")
+            print(f"-> Hata Detayi ({model_adi}): {e}")
             continue
             
-    raise Exception("HATA: Hicbir Groq modeli calismadi! Lutfen API Key'ini sifirdan yenile.")
+    raise Exception("HATA: Modellerin hicbiri calismadi. Lutfen yukaridaki 'Hata Detayi' kismini kontrol et.")
 
 def resim_olustur(ai, gorsel):
     print("Tasarim hazirlaniyor...")
