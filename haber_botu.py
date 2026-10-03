@@ -68,12 +68,11 @@ def gecmiye_kaydet(baslik, resim_yolu):
         subprocess.run(["git", "config", "--global", "user.name", "SantraBot"], check=True)
         subprocess.run(["git", "config", "--global", "user.email", "bot@santrapanosu.com"], check=True)
         
-        # Sırf senin için resmi de dosyalar arasına (GitHub'a) kaydediyoruz
         subprocess.run(["git", "add", HAFIZA_DOSYASI], check=True)
         if os.path.exists(resim_yolu):
             subprocess.run(["git", "add", resim_yolu], check=True)
             
-        subprocess.run(["git", "commit", "-m", "Hafıza ve örnek görsel güncellendi [skip ci]"], check=True)
+        subprocess.run(["git", "commit", "-m", "Hafiza ve ornek gorsel guncellendi [skip ci]"], check=True)
         subprocess.run(["git", "push"], check=True)
         print("Hafıza ve GÖRSEL GitHub deposuna başarıyla kaydedildi! Dosyalarından kontrol edebilirsin.")
     except Exception as e:
@@ -128,23 +127,24 @@ def haberleri_cek():
 
 def yapay_zeka_ile_ozgunlestir(haber_verisi):
     print("Groq yapay zeka devrede, bülten hazırlanıyor...")
-    prompt = f"""
-    Aşağıdaki spor haberini incele ve Instagram için profesyonel bir içerik üret.
-    Senden 4 şey istiyorum ve çıktıyı KESİNLİKLE sadece şu JSON formatında ver, başka hiçbir şey yazma:
-    {{
-        "baslik": "Görsel üzerine yazılacak çarpıcı ve büyük ana başlık",
-        "ozet": "Görselde yer alacak 1 cümlelik vurucu özet",
-        "aciklama": "Görselde yer alacak 2-3 cümlelik kısa kart açıklaması",
-        "detayli_metin": "Instagram açıklaması için; haberin tüm detaylarını, arka planını ve analizini anlatan, en az 3-4 paragraftan oluşan profesyonel metin."
-    }}
     
-    Haber Başlığı: {haber_verisi['orjinal_baslik']}
-    Haber İçeriği: {haber_verisi['orjinal_metin']}
-    """
+    # Çoklu satır kopyalama hatasını önlemek için güvenli format:
+    prompt = (
+        "Aşağıdaki spor haberini incele ve Instagram için profesyonel bir içerik üret.\n"
+        "Senden 4 şey istiyorum ve çıktıyı KESİNLİKLE sadece şu JSON formatında ver, başka hiçbir şey yazma:\n"
+        "{\n"
+        "  \"baslik\": \"Görsel üzerine yazılacak çarpıcı ve büyük ana başlık\",\n"
+        "  \"ozet\": \"Görselde yer alacak 1 cümlelik vurucu özet\",\n"
+        "  \"aciklama\": \"Görselde yer alacak 2-3 cümlelik kısa kart açıklaması\",\n"
+        "  \"detayli_metin\": \"Instagram açıklaması için; haberin detaylarını anlatan profesyonel metin.\"\n"
+        "}\n\n"
+        "Haber Başlığı: " + haber_verisi['orjinal_baslik'] + "\n"
+        "Haber İçeriği: " + haber_verisi['orjinal_metin']
+    )
     
     chat_completion = client.chat.completions.create(
         messages=[{"role": "user", "content": prompt}],
-        model="openai/gpt-oss-20b",
+        model="llama-3.1-8b-instant",  # Yeni aldığın API anahtarı ile %100 açık olan model
     )
     
     cevap = chat_completion.choices[0].message.content
@@ -154,7 +154,10 @@ def yapay_zeka_ile_ozgunlestir(haber_verisi):
 def resim_olustur(ai_veri, gorsel_url):
     print("Tasarım giydiriliyor...")
     
-    # tasarim.html yoksa geçici bir tane oluştur ki hata vermesin
     if not os.path.exists("tasarim.html"):
         print("UYARI: tasarim.html dosyası bulunamadı, basit bir şablon oluşturuluyor...")
-        basit_sablon = """
+        # Çoklu satır hatasını önlemek için güvenli HTML formatı:
+        basit_sablon = (
+            "\n"
+            "\n"
+            "
