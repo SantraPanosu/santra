@@ -69,7 +69,7 @@ def aktif_modeli_bul():
             data = json.loads(response.read().decode())
             bulunanlar = [m["id"] for m in data.get("data", [])]
             print(f"Erisilebilen modeller: {bulunanlar}")
-            for tercih in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", "gemma2-9b-it"]:
+            for tercih in ["openai/gpt-oss-20b - on_demand", "openai/gpt-oss-20b - on_demand", "openai/gpt-oss-20b - on_demand", "gemma2-9b-it"]:
                 if tercih in bulunanlar:
                     print(f"Secilen aktif model: {tercih}")
                     return tercih
@@ -77,7 +77,7 @@ def aktif_modeli_bul():
                 return bulunanlar[0]
     except Exception as e:
         print(f"Model sorgulama uyarisi: {e}")
-    return "llama-3.1-8b-instant"
+    return "openai/gpt-oss-20b - on_demand"
 
 def ozgunlestir(haber):
     print("Yapay zeka devrede...")
