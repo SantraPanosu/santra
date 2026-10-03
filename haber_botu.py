@@ -7,9 +7,12 @@ import traceback
 from playwright.sync_api import sync_playwright
 from instagrapi import Client
 
+# --- KENDİ INSTAGRAM BİLGİLERİNİ BURAYA YAZ ---
+IG_USERNAME = "santrapanosu"
+IG_PASSWORD = "Santra@1357"
+# ----------------------------------------------
+
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-IG_USERNAME = os.environ.get("IG_USERNAME")
-IG_PASSWORD = os.environ.get("IG_PASSWORD")
 
 if not GEMINI_API_KEY:
     raise ValueError("HATA: GEMINI_API_KEY bulunamadı!")
@@ -17,7 +20,7 @@ if not GEMINI_API_KEY:
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-3.8-flash')
 
-# Tüm Yerli/Yabancı Spor Basını ve Haber Kaynakları Havuzu
+# Haber Kaynakları Havuzu
 RSS_KAYNAKLARI = [
     "https://www.fanatik.com.tr/rss/anasayfa",
     "https://www.fotomac.com.tr/rss/anasayfa.xml",
@@ -67,19 +70,22 @@ def haberleri_cek():
     }
 
 def yapay_zeka_ile_ozgunlestir(haber_verisi):
-    print("Yapay zeka devrede...")
+    print("Yapay zeka devrede, kapsamlı haber bülteni hazırlanıyor...")
     prompt = f"""
-    Aşağıdaki haberi okuyarak Instagram için modern bir haber kartı metni oluştur.
-    Senden 3 şey istiyorum:
-    1. Çarpıcı, merak uyandıran modern bir 'Ana Başlık' (baslik)
-    2. 1 cümlelik vurucu 'Ne Oldu?' özeti (ozet)
-    3. Okuyucuyu yormayacak 2-3 cümlelik kısa açıklama (aciklama)
+    Aşağıdaki spor haberini ve içeriğini dikkatlice incele. Okuyucunun başka hiçbir siteye gitmesine gerek kalmayacak şekilde, olayın tüm detaylarını, arka planını ve gelişmelerini açıklayan eksiksiz bir Instagram metni oluştur.
     
-    Sadece aşağıdaki JSON formatında çıktı ver, başka hiçbir şey yazma:
+    Senden 4 şey istiyorum ve çıktıyı KESİNLİKLE sadece aşağıdaki JSON formatında ver:
+    1. "baslik": Görsel üzerine yazılacak çarpıcı ve büyük ana başlık.
+    2. "ozet": Görselde yer alacak 1 cümlelik vurucu özet.
+    3. "aciklama": Görselde yer alacak 2-3 cümlelik kısa kart açıklaması.
+    4. "detayli_metin": Instagram açıklaması için; haberin tüm detaylarını, kimin ne dediğini, sürecin nasıl geliştiğini ve arka planını anlatan, en az 3-4 zengin paragraftan oluşan kapsamlı, profesyonel haber bülteni metni.
+    
+    JSON formatı dışında asla başka bir şey yazma:
     {{
         "baslik": "...",
         "ozet": "...",
-        "aciklama": "..."
+        "aciklama": "...",
+        "detayli_metin": "..."
     }}
     
     Haber Başlığı: {haber_verisi['orjinal_baslik']}
@@ -90,13 +96,13 @@ def yapay_zeka_ile_ozgunlestir(haber_verisi):
     return json.loads(temiz_metin)
 
 def resim_olustur(ai_veri, gorsel_url):
-    print("Tasarım giydiriliyor ve haber görseli arka plana işleniyor...")
+    print("Tasarım giydiriliyor ve dinamik arka plan işleniyor...")
     with open("tasarim.html", "r", encoding="utf-8") as f:
         html = f.read()
         
-    html = html.replace("Beşiktaş'tan Flaş Hamle: Kadro Planlamasında Yeni Hedefler Belli Oldu!", ai_veri["baslik"])
-    html = html.replace("Siyah-beyazlı yönetim, transfer döneminin kapanmasına kısa süre kala eksik bölgeler için düğmeye bastı.", ai_veri["ozet"])
-    html = html.replace("Teknik heyetin sunduğu detaylı rapor doğrultusunda hareket eden komite, alternatifli bir oyuncu havuzu oluşturdu. Gelişmelerin hafta sonuna kadar netleşmesi bekleniyor.", ai_veri["aciklama"])
+    html = html.replace("BASLIK_BURAYA", ai_veri["baslik"])
+    html = html.replace("OZET_BURAYA", ai_veri["ozet"])
+    html = html.replace("ACIKLAMA_BURAYA", ai_veri["aciklama"])
     html = html.replace("ARKA_PLAN_GORSELI_BURAYA", gorsel_url)
     
     with open("gecici.html", "w", encoding="utf-8") as f:
@@ -117,17 +123,28 @@ def resim_olustur(ai_veri, gorsel_url):
     return resim_yolu
 
 def instagrama_yukle(resim_yolu, ai_veri):
-    print("Instagram'a bağlanılıyor...")
-    if not IG_USERNAME or not IG_PASSWORD:
-        print("UYARI: Instagram şifreleri bulunamadı, paylaşım atlandı.")
-        return
-
+    print("Instagram'a otomatik bağlanılıyor...")
     try:
         cl = Client()
         cl.login(IG_USERNAME, IG_PASSWORD)
-        caption = f"🚨 {ai_veri['baslik']}\n\n👉 {ai_veri['ozet']}\n\n{ai_veri['aciklama']}\n\n#SantraPanosu #SporGündemi #Futbol #Transfer #Haber"
+        
+        # Keşfet ve etkileşim Odaklı Güçlü Hashtag & CTA Havuzu
+        hashtags = (
+            "#SantraPanosu #SporGündemi #Futbol #SüperLig #Transfer "
+            "#SonDakika #Galatasaray #Fenerbahçe #Beşiktaş #Trabzonspor "
+            "#MilliTakim #Maç #Keşfet #Explore #FootballNews #SporHaberleri"
+        )
+        
+        caption = (
+            f"🚨 {ai_veri['baslik']}\n\n"
+            f"{ai_veri['detayli_metin']}\n\n"
+            "📌 Bu tarz en güncel gelişmelerden anında haberdar olmak için gönderiyi beğenmeyi ve kaydetmeyi unutmayın!\n\n"
+            "👇 Sizce bu olay takımınızı nasıl etkiler? Yorumlarda buluşalım!\n\n"
+            f"{hashtags}"
+        )
+        
         cl.photo_upload(resim_yolu, caption)
-        print("BAŞARILI: Gönderi Instagram'da yayınlandı! ✅")
+        print("BAŞARILI: Gönderi Keşfet odaklı optimize edilmiş açıklamasıyla yayınlandı! ✅")
     except Exception as e:
         print(f"Instagram Paylaşım Hatası: {e}")
 
