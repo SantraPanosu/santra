@@ -1,4 +1,5 @@
 import os
+import random
 import feedparser
 import google.generativeai as genai
 import json
@@ -16,17 +17,42 @@ if not GEMINI_API_KEY:
 genai.configure(api_key=GEMINI_API_KEY)
 model = genai.GenerativeModel('gemini-3.8-flash')
 
-def haberleri_cek(rss_url):
-    print(f"Haberler çekiliyor: {rss_url}")
-    feed = feedparser.parse(rss_url)
+# Tüm Yerli/Yabancı Spor Basını ve Haber Kaynakları Havuzu
+RSS_KAYNAKLARI = [
+    "https://www.fanatik.com.tr/rss/anasayfa",
+    "https://www.fotomac.com.tr/rss/anasayfa.xml",
+    "https://www.sporx.com/rss.php",
+    "https://feeds.bbci.co.uk/turkce/rss.xml",
+    "https://beinsports.com.tr/rss/haberler",
+    "https://www.transfermarkt.com.tr/rss/news",
+    "https://www.trthaber.com/spor_articles.rss",
+    "https://www.ntv.com.tr/spor.rss",
+    "https://www.cnnturk.com/feed/rss/spor/news",
+    "https://www.hurriyet.com.tr/rss/spor",
+    "https://www.cumhuriyet.com.tr/rss/kategori/spor-7",
+    "https://www.milliyet.com.tr/rss/rssnew/sporvadisi/tumu.xml",
+    "https://www.sabah.com.tr/rss/spor.xml",
+    "https://www.aksam.com.tr/rss/spor.rss",
+    "https://www.yenisafak.com/rss/spor"
+]
+
+def haberleri_cek():
+    secilen_rss = random.choice(RSS_KAYNAKLARI)
+    print(f"Seçilen Kaynak: {secilen_rss}")
+    
+    feed = feedparser.parse(secilen_rss)
     if not feed.entries:
-        raise Exception("RSS kaynağından haber bulunamadı!")
+        print(f"UYARI: {secilen_rss} kaynağından haber alınamadı, başka bir kaynağa bakılıyor...")
+        return None
         
     en_yeni_haber = feed.entries[0]
+    
     gorsel_url = "https://images.unsplash.com/photo-1518605368461-1e1e12db801b?q=80&w=1080" 
     
     if 'media_content' in en_yeni_haber:
         gorsel_url = en_yeni_haber.media_content[0]['url']
+    elif 'enclosures' in en_yeni_haber and len(en_yeni_haber.enclosures) > 0:
+        gorsel_url = en_yeni_haber.enclosures[0]['href']
     elif 'links' in en_yeni_haber:
         for link in en_yeni_haber.links:
             if 'image' in link.get('type', ''):
@@ -68,12 +94,9 @@ def resim_olustur(ai_veri, gorsel_url):
     with open("tasarim.html", "r", encoding="utf-8") as f:
         html = f.read()
         
-    # Metinleri değiştir
     html = html.replace("Beşiktaş'tan Flaş Hamle: Kadro Planlamasında Yeni Hedefler Belli Oldu!", ai_veri["baslik"])
     html = html.replace("Siyah-beyazlı yönetim, transfer döneminin kapanmasına kısa süre kala eksik bölgeler için düğmeye bastı.", ai_veri["ozet"])
     html = html.replace("Teknik heyetin sunduğu detaylı rapor doğrultusunda hareket eden komite, alternatifli bir oyuncu havuzu oluşturdu. Gelişmelerin hafta sonuna kadar netleşmesi bekleniyor.", ai_veri["aciklama"])
-    
-    # Haber sitesinin kendi görselini doğrudan arka plan stilinin içine enjekte ediyoruz
     html = html.replace("ARKA_PLAN_GORSELI_BURAYA", gorsel_url)
     
     with open("gecici.html", "w", encoding="utf-8") as f:
@@ -102,19 +125,24 @@ def instagrama_yukle(resim_yolu, ai_veri):
     try:
         cl = Client()
         cl.login(IG_USERNAME, IG_PASSWORD)
-        caption = f"🚨 {ai_veri['baslik']}\n\n👉 {ai_veri['ozet']}\n\n{ai_veri['aciklama']}\n\n#SantraPanosu #SporGündemi #Futbol #Haber"
+        caption = f"🚨 {ai_veri['baslik']}\n\n👉 {ai_veri['ozet']}\n\n{ai_veri['aciklama']}\n\n#SantraPanosu #SporGündemi #Futbol #Transfer #Haber"
         cl.photo_upload(resim_yolu, caption)
         print("BAŞARILI: Gönderi Instagram'da yayınlandı! ✅")
     except Exception as e:
         print(f"Instagram Paylaşım Hatası: {e}")
 
 if __name__ == "__main__":
-    RSS_KAYNAGI = "https://www.trthaber.com/spor_articles.rss" 
-    
-    haber = haberleri_cek(RSS_KAYNAGI)
+    haber = None
+    for _ in range(5):
+        haber = haberleri_cek()
+        if haber:
+            break
+            
     if haber:
         islenmis = yapay_zeka_ile_ozgunlestir(haber)
         if islenmis:
             resim_dosyasi = resim_olustur(islenmis, haber['gorsel_url'])
             instagrama_yukle(resim_dosyasi, islenmis)
             print("Süreç tamamen tamamlandı!")
+    else:
+        print("HATA: Hiçbir kaynaktan haber alınamadı.")
