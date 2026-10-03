@@ -63,10 +63,11 @@ def ozgunlestir(haber):
     prompt = "Su spor haberini incele ve SADECE JSON formatinda ver. Baska hicbir kelime yazma: {\"baslik\":\"kisa baslik\",\"ozet\":\"1 cumle\",\"aciklama\":\"kisa\",\"detayli_metin\":\"uzun text\"}. Haber: " + haber['baslik'] + " - " + haber['metin']
     
     modeller = [
-        "llama3-8b-8192", 
-        "llama3-70b-8192", 
-        "mixtral-8x7b-32768",
-        "gemma-7b-it"
+        "gemma2-9b-it",
+        "llama-3.3-70b-versatile",
+        "llama-3.1-8b-instant",
+        "llama-3.2-3b-preview",
+        "llama-3.2-1b-preview"
     ]
     
     for model_adi in modeller:
@@ -79,7 +80,6 @@ def ozgunlestir(haber):
             cevap = chat.choices[0].message.content
             print(f"Basarili model: {model_adi}")
             
-            # Yapay zeka fazladan metin yazarsa diye sadece { ... } arasini zorla cekiyoruz
             json_match = re.search(r'\{.*?\}', cevap.replace('\n', ''), re.IGNORECASE | re.DOTALL)
             if json_match:
                 temiz_metin = json_match.group(0)
