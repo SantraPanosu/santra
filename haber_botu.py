@@ -13,7 +13,8 @@ if not GEMINI_API_KEY:
     raise ValueError("HATA: GEMINI_API_KEY bulunamadı!")
 
 genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
+# Güncel model adını kullanıyoruz
+model = genai.GenerativeModel('gemini-2.5-flash')
 
 def haberleri_cek(rss_url):
     print(f"Haberler çekiliyor: {rss_url}")
