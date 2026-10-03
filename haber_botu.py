@@ -8,14 +8,13 @@ import feedparser
 from groq import Groq
 from playwright.sync_api import sync_playwright
 
-# --- KENDİ BİLGİLERİNİ BURAYA YAZ ---
-IG_USERNAME = "santrapanosu"
-IG_PASSWORD = "Santra@1357"
-GROQ_API_KEY = "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"
-# ------------------------------------
+# --- HASSAS BİLGİLER GITHUB SECRETS'TEN OTOMATİK ÇEKİLİR ---
+IG_USERNAME = os.environ.get("IG_USERNAME")
+IG_PASSWORD = os.environ.get("IG_PASSWORD")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
-if not GROQ_API_KEY or GROQ_API_KEY == "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":
-    raise ValueError("HATA: GROQ_API_KEY girilmedi!")
+if not GROQ_API_KEY or not IG_USERNAME or not IG_PASSWORD:
+    raise ValueError("HATA: Gerekli ortam değişkenleri (Secrets) eksik! Lütfen GitHub Secrets ayarlarını kontrol edin.")
 
 client = Groq(api_key=GROQ_API_KEY)
 
@@ -184,13 +183,12 @@ def instagrama_yukle_guvenli(resim_yolu, ai_veri):
     caption = (
         f"🚨 {ai_veri['baslik']}\n\n"
         f"{ai_veri['detayli_metin']}\n\n"
-        "📌 Bu tarz en güncel gelişmelerden anında haberdar olmak için gönderiyi beğenmeyi ve kaydetmeyi unutmayın!\n\n"
+        "📌 This tarz en güncel gelişmelerden anında haberdar olmak için gönderiyi beğenmeyi ve kaydetmeyi unutmayın!\n\n"
         "👇 Sizce bu olay takımınızı nasıl etkiler? Yorumlarda buluşalım!\n\n"
         f"{hashtags}"
     )
 
     with sync_playwright() as p:
-        # Tarayıcıyı gerçek kullanıcı profili gibi başlatıyoruz
         browser = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox"])
         context = browser.new_context(viewport={"width": 1280, "height": 800})
         page = context.new_page()
@@ -200,7 +198,6 @@ def instagrama_yukle_guvenli(resim_yolu, ai_veri):
             page.goto("https://www.instagram.com/accounts/login/", timeout=60000)
             time.sleep(5)
             
-            # Çerezleri kabul et butonu çıkarsa basalım
             try:
                 page.locator("button:has-text('Allow all cookies')").click(timeout=3000)
             except:
@@ -211,11 +208,9 @@ def instagrama_yukle_guvenli(resim_yolu, ai_veri):
             page.locator("input[name='password']").fill(IG_PASSWORD)
             page.locator("button[type='submit']").click()
             
-            # Girişin tamamlanması için bekleyelim
             print("Giriş yapılıyor, bekleniyor...")
             time.sleep(10)
             
-            # Bildirimleri kapat pencereleri çıkarsa geçelim
             try:
                 page.locator("button:has-text('Not Now')").click(timeout=5000)
             except:
@@ -226,19 +221,14 @@ def instagrama_yukle_guvenli(resim_yolu, ai_veri):
                 pass
 
             print("Ana sayfadayız, yeni gönderi oluşturuluyor...")
-            # Yeni gönderi oluşturma butonunu bulup tıklıyoruz (Artı ikonu)
-            # Alternatif olarak direkt web upload URL'sine yönlendiriyoruz
             page.goto("https://www.instagram.com/create/style/", timeout=60000)
             time.sleep(5)
             
-            # Dosya yükleme alanını buluyoruz
             print("Görsel yükleniyor...")
             file_input = page.locator("input[type='file']")
             file_input.set_input_files(resim_yolu)
             time.sleep(5)
             
-            # İleri butonlarına tıklama süreçleri
-            # (Not: Instagram web arayüzü güncellemelerine göre buton metinleri değişebilir, sırasıyla 'İleri' / 'Next' tıklanır)
             for _ in range(3):
                 try:
                     next_btn = page.locator("button:has-text('İleri'), button:has-text('Next')")
@@ -249,7 +239,6 @@ def instagrama_yukle_guvenli(resim_yolu, ai_veri):
                     break
 
             print("Açıklama metni ekleniyor...")
-            # Açıklama metni yazma alanını buluyoruz
             textarea = page.locator("div[aria-label='Write a caption...'], div[aria-label='Bir açıklama yazın...'], textarea")
             textarea.fill(caption)
             time.sleep(3)
