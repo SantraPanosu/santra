@@ -2,9 +2,7 @@ name: Haber Botu Otomasyonu
 
 on:
   schedule:
-    # Her 30 dakikada bir çalıştır (Cron formatı)
     - cron: '*/30 * * * *'
-  # Test edebilmen için manuel çalıştırma butonu ekliyoruz
   workflow_dispatch:
 
 jobs:
@@ -24,9 +22,16 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        playwright install chromium
 
     - name: Botu Çalıştır
       env:
         GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       run: |
         python haber_botu.py
+
+    - name: Görseli Kaydet (İndirebilmen için)
+      uses: actions/upload-artifact@v4
+      with:
+        name: santra-haber-gorseli
+        path: santra_haber.png
