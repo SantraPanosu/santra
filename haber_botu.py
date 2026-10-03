@@ -1,4 +1,4 @@
-import os, random, re, json, subprocess, time, feedparser
+import os, random, re, json, subprocess, time, feedparser, urllib.request
 from groq import Groq
 from playwright.sync_api import sync_playwright
 
@@ -58,33 +58,46 @@ def haberleri_cek():
     if not haberler: return None
     return random.choice(haberler)
 
+def aktif_modeli_bul():
+    print("Groq sunucusundan aktif modeller sorgulaniyor...")
+    try:
+        req = urllib.request.Request(
+            "https://api.groq.com/openai/v1/models",
+            headers={"Authorization": f"Bearer {GROQ_API_KEY}"}
+        )
+        with urllib.request.urlopen(req) as response:
+            data = json.loads(response.read().decode())
+            bulunanlar = [m["id"] for m in data.get("data", [])]
+            print(f"Erisilebilen modeller: {bulunanlar}")
+            for tercih in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", "gemma2-9b-it"]:
+                if tercih in bulunanlar:
+                    print(f"Secilen aktif model: {tercih}")
+                    return tercih
+            if bulunanlar:
+                return bulunanlar[0]
+    except Exception as e:
+        print(f"Model sorgulama uyarisi: {e}")
+    return "llama-3.1-8b-instant"
+
 def ozgunlestir(haber):
+    print("Yapay zeka devrede...")
     prompt = "Su spor haberini incele ve SADECE JSON formatinda ver. Baska hicbir kelime yazma: {\"baslik\":\"kisa baslik\",\"ozet\":\"1 cumle\",\"aciklama\":\"kisa\",\"detayli_metin\":\"uzun text\"}. Haber: " + haber['baslik'] + " - " + haber['metin']
     
-    modeller = [
-        "llama-3.1-8b-instant",
-        "llama-3.1-70b-versatile",
-        "mixtral-8x7b-32768",
-        "gemma2-9b-it"
-    ]
+    secilen_model = aktif_modeli_bul()
     
-    for model_adi in modeller:
-        try:
-            chat = client.chat.completions.create(
-                messages=[{"role": "user", "content": prompt}],
-                model=model_adi
-            )
-            cevap = chat.choices[0].message.content
-            json_match = re.search(r'\{.*?\}', cevap.replace('\n', ''), re.IGNORECASE | re.DOTALL)
-            if json_match:
-                temiz_metin = json_match.group(0)
-            else:
-                temiz_metin = cevap.replace("```json", "").replace("```", "").strip()
-            return json.loads(temiz_metin)
-        except Exception as e:
-            continue
-            
-    raise Exception("HATA: Hicbir model calismadi.")
+    chat = client.chat.completions.create(
+        messages=[{"role": "user", "content": prompt}],
+        model=secilen_model
+    )
+    cevap = chat.choices[0].message.content
+    
+    json_match = re.search(r'\{.*?\}', cevap.replace('\n', ''), re.IGNORECASE | re.DOTALL)
+    if json_match:
+        temiz_metin = json_match.group(0)
+    else:
+        temiz_metin = cevap.replace("```json", "").replace("```", "").strip()
+        
+    return json.loads(temiz_metin)
 
 def resim_olustur(ai, gorsel):
     html_icerik = "<html><body style=\"background:url('" + gorsel + "');color:#fff;padding:50px\"><h1>" + ai["baslik"] + "</h1><h2>" + ai["ozet"] + "</h2><p>" + ai["aciklama"] + "</p></body></html>"
