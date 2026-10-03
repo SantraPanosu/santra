@@ -88,11 +88,11 @@ def resim_olustur(ai_veri, gorsel_url):
             f.write(html)
             
         print("Ekran görüntüsü alınıyor...")
-        # Dosyanın tam ana dizine kaydedilmesini garantiliyoruz
         resim_yolu = os.path.join(os.getcwd(), "santra_haber.jpg")
         
         with sync_playwright() as p:
-            browser = p.chromium.launch()
+            # Linux sunucusunda çökmemesi için --no-sandbox argümanını ekledik!
+            browser = p.chromium.launch(args=["--no-sandbox", "--disable-setuid-sandbox"])
             page = browser.new_page(set_viewport_size={"width": 1080, "height": 1080})
             page.goto(f"file://{os.path.abspath('gecici.html')}")
             page.locator(".card").screenshot(path=resim_yolu, type="jpeg", quality=90)
@@ -101,7 +101,7 @@ def resim_olustur(ai_veri, gorsel_url):
         print(f"BAŞARILI: {resim_yolu} oluşturuldu.")
         return "santra_haber.jpg"
     except Exception as e:
-        print(f"Resim Oluşturma Hatası: {e}")
+        print(f"Resim Oluşturma Kritik Hatası: {e}")
         return None
 
 if __name__ == "__main__":
