@@ -4,7 +4,6 @@ import google.generativeai as genai
 import json
 from playwright.sync_api import sync_playwright
 
-# Şifreleri Çekiyoruz
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 IG_USERNAME = os.environ.get("IG_USERNAME")
 IG_PASSWORD = os.environ.get("IG_PASSWORD")
