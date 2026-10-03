@@ -4,6 +4,7 @@ import google.generativeai as genai
 import json
 import traceback
 from playwright.sync_api import sync_playwright
+from instagrapi import Client
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 IG_USERNAME = os.environ.get("IG_USERNAME")
@@ -63,15 +64,17 @@ def yapay_zeka_ile_ozgunlestir(haber_verisi):
     return json.loads(temiz_metin)
 
 def resim_olustur(ai_veri, gorsel_url):
-    print("Tasarım giydiriliyor...")
+    print("Tasarım giydiriliyor ve haber görseli arka plana işleniyor...")
     with open("tasarim.html", "r", encoding="utf-8") as f:
         html = f.read()
         
+    # Metinleri değiştir
     html = html.replace("Beşiktaş'tan Flaş Hamle: Kadro Planlamasında Yeni Hedefler Belli Oldu!", ai_veri["baslik"])
     html = html.replace("Siyah-beyazlı yönetim, transfer döneminin kapanmasına kısa süre kala eksik bölgeler için düğmeye bastı.", ai_veri["ozet"])
     html = html.replace("Teknik heyetin sunduğu detaylı rapor doğrultusunda hareket eden komite, alternatifli bir oyuncu havuzu oluşturdu. Gelişmelerin hafta sonuna kadar netleşmesi bekleniyor.", ai_veri["aciklama"])
-    html = html.replace("https://images.unsplash.com/photo-1518605368461-1e1e12db801b?q=80&w=1080&auto=format&fit=crop", gorsel_url)
-    html = html.replace("https://images.unsplash.com/photo-1518605368461-1e1e12db801b?q=80&w=1080", gorsel_url)
+    
+    # Haber sitesinin kendi görselini doğrudan arka plan stilinin içine enjekte ediyoruz
+    html = html.replace("ARKA_PLAN_GORSELI_BURAYA", gorsel_url)
     
     with open("gecici.html", "w", encoding="utf-8") as f:
         f.write(html)
@@ -82,14 +85,28 @@ def resim_olustur(ai_veri, gorsel_url):
     with sync_playwright() as p:
         browser = p.chromium.launch(args=["--no-sandbox", "--disable-setuid-sandbox"])
         page = browser.new_page()
-        # Ekran boyutunu doğru yöntemle ayarlıyoruz
         page.set_viewport_size({"width": 1080, "height": 1080})
         page.goto(f"file://{os.path.abspath('gecici.html')}")
         page.locator(".card").screenshot(path=resim_yolu, type="jpeg", quality=90)
         browser.close()
         
     print(f"BAŞARILI: {resim_yolu} oluşturuldu.")
-    return "santra_haber.jpg"
+    return resim_yolu
+
+def instagrama_yukle(resim_yolu, ai_veri):
+    print("Instagram'a bağlanılıyor...")
+    if not IG_USERNAME or not IG_PASSWORD:
+        print("UYARI: Instagram şifreleri bulunamadı, paylaşım atlandı.")
+        return
+
+    try:
+        cl = Client()
+        cl.login(IG_USERNAME, IG_PASSWORD)
+        caption = f"🚨 {ai_veri['baslik']}\n\n👉 {ai_veri['ozet']}\n\n{ai_veri['aciklama']}\n\n#SantraPanosu #SporGündemi #Futbol #Haber"
+        cl.photo_upload(resim_yolu, caption)
+        print("BAŞARILI: Gönderi Instagram'da yayınlandı! ✅")
+    except Exception as e:
+        print(f"Instagram Paylaşım Hatası: {e}")
 
 if __name__ == "__main__":
     RSS_KAYNAGI = "https://www.trthaber.com/spor_articles.rss" 
@@ -99,4 +116,5 @@ if __name__ == "__main__":
         islenmis = yapay_zeka_ile_ozgunlestir(haber)
         if islenmis:
             resim_dosyasi = resim_olustur(islenmis, haber['gorsel_url'])
-            print("Süreç başarıyla tamamlandı!")
+            instagrama_yukle(resim_dosyasi, islenmis)
+            print("Süreç tamamen tamamlandı!")
