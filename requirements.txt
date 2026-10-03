@@ -1,3 +1,4 @@
 feedparser
 google-generativeai
 playwright
+instagrapi
