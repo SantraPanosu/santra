@@ -41,7 +41,7 @@ def gecmiye_kaydet(baslik, resim_yolu):
         subprocess.run(["git", "commit", "-m", "Guncelleme [skip ci]"], check=True)
         subprocess.run(["git", "push"], check=True)
     except Exception as e:
-        print("Git kayit hatasi:", e)
+        pass
 
 def haberleri_cek():
     paylasilanlar = gecmisi_yukle()
@@ -59,49 +59,37 @@ def haberleri_cek():
     return random.choice(haberler)
 
 def ozgunlestir(haber):
-    print("Yapay zeka devrede...")
     prompt = "Su spor haberini incele ve SADECE JSON formatinda ver. Baska hicbir kelime yazma: {\"baslik\":\"kisa baslik\",\"ozet\":\"1 cumle\",\"aciklama\":\"kisa\",\"detayli_metin\":\"uzun text\"}. Haber: " + haber['baslik'] + " - " + haber['metin']
     
     modeller = [
-        "gemma2-9b-it",
-        "llama-3.3-70b-versatile",
         "llama-3.1-8b-instant",
-        "llama-3.2-3b-preview",
-        "llama-3.2-1b-preview"
+        "llama-3.1-70b-versatile",
+        "mixtral-8x7b-32768",
+        "gemma2-9b-it"
     ]
     
     for model_adi in modeller:
         try:
-            print(f"Deneniyor: {model_adi}")
             chat = client.chat.completions.create(
                 messages=[{"role": "user", "content": prompt}],
                 model=model_adi
             )
             cevap = chat.choices[0].message.content
-            print(f"Basarili model: {model_adi}")
-            
             json_match = re.search(r'\{.*?\}', cevap.replace('\n', ''), re.IGNORECASE | re.DOTALL)
             if json_match:
                 temiz_metin = json_match.group(0)
             else:
                 temiz_metin = cevap.replace("```json", "").replace("```", "").strip()
-                
             return json.loads(temiz_metin)
         except Exception as e:
-            print(f"-> Hata Detayi ({model_adi}): {e}")
             continue
             
-    raise Exception("HATA: Modellerin hicbiri calismadi. Lutfen yukaridaki 'Hata Detayi' kismini kontrol et.")
+    raise Exception("HATA: Hicbir model calismadi.")
 
 def resim_olustur(ai, gorsel):
-    print("Tasarim hazirlaniyor...")
     html_icerik = "<html><body style=\"background:url('" + gorsel + "');color:#fff;padding:50px\"><h1>" + ai["baslik"] + "</h1><h2>" + ai["ozet"] + "</h2><p>" + ai["aciklama"] + "</p></body></html>"
-    
-    with open("gecici.html", "w", encoding="utf-8") as f: 
-        f.write(html_icerik)
-        
+    with open("gecici.html", "w", encoding="utf-8") as f: f.write(html_icerik)
     yol = os.path.join(os.getcwd(), "santra_haber.jpg")
-    
     with sync_playwright() as p:
         browser = p.chromium.launch(args=["--no-sandbox"])
         page = browser.new_page(viewport={"width": 1080, "height": 1080})
@@ -111,7 +99,6 @@ def resim_olustur(ai, gorsel):
     return yol
 
 def instagram_yukle(resim, ai):
-    print("Instagram'a yukleniyor...")
     caption = "🚨 " + ai['baslik'] + "\n\n" + ai['detayli_metin'] + "\n\n#Futbol #Spor #Transfer"
     with sync_playwright() as p:
         b = p.chromium.launch(headless=True, args=["--no-sandbox"])
@@ -122,27 +109,20 @@ def instagram_yukle(resim, ai):
         page.locator("input[name='password']").fill(IG_PASSWORD)
         page.locator("button[type='submit']").click()
         time.sleep(8)
-        
-        if page.locator("text='Sorry, your password was incorrect.'").is_visible():
-            raise Exception("Sifre Yanlis!")
-            
         page.goto("https://www.instagram.com/create/style/")
         time.sleep(3)
         page.locator("input[type='file']").set_input_files(resim)
         time.sleep(3)
-        
         for _ in range(2):
             try:
                 page.locator("button:has-text('İleri'), button:has-text('Next')").click()
                 time.sleep(2)
             except: pass
-            
         page.locator("div[aria-label='Write a caption...'], textarea").fill(caption)
         time.sleep(2)
         page.locator("button:has-text('Paylaş'), button:has-text('Share')").click()
         time.sleep(8)
         b.close()
-        print("Paylasim basarili!")
 
 if __name__ == "__main__":
     h = haberleri_cek()
