@@ -1,5 +1,6 @@
 import os
 import random
+import re
 import feedparser
 import google.generativeai as genai
 import json
@@ -8,8 +9,8 @@ from playwright.sync_api import sync_playwright
 from instagrapi import Client
 
 # --- KENDİ INSTAGRAM BİLGİLERİNİ BURAYA YAZ ---
-IG_USERNAME = "santrapanosu"
-IG_PASSWORD = "Santra@1357"
+IG_USERNAME = "KULLANICI_ADIN"
+IG_PASSWORD = "SIFREN"
 # ----------------------------------------------
 
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
@@ -39,6 +40,15 @@ RSS_KAYNAKLARI = [
     "https://www.yenisafak.com/rss/spor"
 ]
 
+# Görsel bulunamadığında kullanılacak yüksek kaliteli futbol/stadyum arka plan havuzu
+YEDEK_GORSELLER = [
+    "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=1080",
+    "https://images.unsplash.com/photo-1518605368461-1e1e12db801b?q=80&w=1080",
+    "https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=1080",
+    "https://images.unsplash.com/photo-1522778119026-d647f0596c20?q=80&w=1080",
+    "https://images.unsplash.com/photo-1556056504-5c7696c4c28d?q=80&w=1080"
+]
+
 def haberleri_cek():
     secilen_rss = random.choice(RSS_KAYNAKLARI)
     print(f"Seçilen Kaynak: {secilen_rss}")
@@ -50,8 +60,10 @@ def haberleri_cek():
         
     en_yeni_haber = feed.entries[0]
     
-    gorsel_url = "https://images.unsplash.com/photo-1518605368461-1e1e12db801b?q=80&w=1080" 
+    # Varsayılan olarak yedek havuzdan rastgele bir spor görseli atıyoruz
+    gorsel_url = random.choice(YEDEK_GORSELLER)
     
+    # 1. Yöntem: Standart RSS media veya enclosure alanlarına bak
     if 'media_content' in en_yeni_haber:
         gorsel_url = en_yeni_haber.media_content[0]['url']
     elif 'enclosures' in en_yeni_haber and len(en_yeni_haber.enclosures) > 0:
@@ -61,11 +73,18 @@ def haberleri_cek():
             if 'image' in link.get('type', ''):
                 gorsel_url = link.href
                 break
+                
+    # 2. Yöntem: Eğer yukarıdakiler boşsa, haber metninin içindeki HTML img etiketini ara
+    aciklama_metni = en_yeni_haber.get('description', '')
+    if not gorsel_url or gorsel_url in YEDEK_GORSELLER:
+        img_match = re.search(r'src=["\'](https?://[^"\']+\.(?:jpg|jpeg|png|webp))["\']', aciklama_metni, re.IGNORECASE)
+        if img_match:
+            gorsel_url = img_match.group(1)
     
-    print(f"Haber çekildi: {en_yeni_haber.title}")
+    print(f"Haber çekildi: {en_yeni_haber.title} | Kullanılan Görsel: {gorsel_url}")
     return {
         'orjinal_baslik': en_yeni_haber.title,
-        'orjinal_metin': en_yeni_haber.get('description', ''),
+        'orjinal_metin': aciklama_metni,
         'gorsel_url': gorsel_url
     }
 
@@ -119,7 +138,7 @@ def resim_olustur(ai_veri, gorsel_url):
         page.locator(".card").screenshot(path=resim_yolu, type="jpeg", quality=90)
         browser.close()
         
-    print(f"BAŞARILI: {resim_yolu} oluşturuldu.")
+    print(f"BAŞARILI: {resil_yolu if 'resil_yolu' in locals() else resim_yolu} oluşturuldu.")
     return resim_yolu
 
 def instagrama_yukle(resim_yolu, ai_veri):
@@ -128,7 +147,6 @@ def instagrama_yukle(resim_yolu, ai_veri):
         cl = Client()
         cl.login(IG_USERNAME, IG_PASSWORD)
         
-        # Keşfet ve etkileşim Odaklı Güçlü Hashtag & CTA Havuzu
         hashtags = (
             "#SantraPanosu #SporGündemi #Futbol #SüperLig #Transfer "
             "#SonDakika #Galatasaray #Fenerbahçe #Beşiktaş #Trabzonspor "
@@ -144,7 +162,7 @@ def instagrama_yukle(resim_yolu, ai_veri):
         )
         
         cl.photo_upload(resim_yolu, caption)
-        print("BAŞARILI: Gönderi Keşfet odaklı optimize edilmiş açıklamasıyla yayınlandı! ✅")
+        print("BAŞARILI: Gönderi Keşfet odaklı açıklamasıyla yayınlandı! ✅")
     except Exception as e:
         print(f"Instagram Paylaşım Hatası: {e}")
 
