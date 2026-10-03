@@ -139,7 +139,7 @@ def yapay_zeka_ile_ozgunlestir(haber_verisi):
     
     chat_completion = client.chat.completions.create(
         messages=[{"role": "user", "content": prompt}],
-        model="llama-3.1-8b-instant",  # Güncel ve aktif Groq modeli
+        model="llama-3.1-8b-instant",  # Groq güncel aktif model kimliği
     )
     
     cevap = chat_completion.choices[0].message.content
