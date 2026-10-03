@@ -139,7 +139,7 @@ def yapay_zeka_ile_ozgunlestir(haber_verisi):
     
     chat_completion = client.chat.completions.create(
         messages=[{"role": "user", "content": prompt}],
-        model="llama-3.3-70b-versatile",
+        model="llama-3.1-8b-instant",  # Kararlı ve hatasız çalışan Groq modeli
     )
     
     cevap = chat_completion.choices[0].message.content
@@ -183,7 +183,7 @@ def instagrama_yukle_guvenli(resim_yolu, ai_veri):
     caption = (
         f"🚨 {ai_veri['baslik']}\n\n"
         f"{ai_veri['detayli_metin']}\n\n"
-        "📌 This tarz en güncel gelişmelerden anında haberdar olmak için gönderiyi beğenmeyi ve kaydetmeyi unutmayın!\n\n"
+        "📌 Bu tarz en güncel gelişmelerden anında haberdar olmak için gönderiyi beğenmeyi ve kaydetmeyi unutmayın!\n\n"
         "👇 Sizce bu olay takımınızı nasıl etkiler? Yorumlarda buluşalım!\n\n"
         f"{hashtags}"
     )
