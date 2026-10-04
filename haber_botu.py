@@ -49,12 +49,12 @@ def gecmiye_kaydet(baslik, resim_yolu, aciklama_yolu):
         json.dump(paylasilanlar, f, ensure_ascii=False, indent=4)
     
     try:
-        subprocess.run(["git", "config", "--global", "user.name", "SantraBot"], check=True)
-        subprocess.run(["git", "config", "--global", "user.email", "bot@santrapanosu.com"], check=True)
+        subprocess.run(["git", "config", "--global", "user.name", "SahaEkraniBot"], check=True)
+        subprocess.run(["git", "config", "--global", "user.email", "bot@sahaekrani.com"], check=True)
         subprocess.run(["git", "add", HAFIZA_DOSYASI], check=True)
         if os.path.exists(resim_yolu): subprocess.run(["git", "add", resim_yolu], check=True)
         if os.path.exists(aciklama_yolu): subprocess.run(["git", "add", aciklama_yolu], check=True)
-        subprocess.run(["git", "commit", "-m", "Yeni haber hazirlandi (Gorsel + Aciklama) [skip ci]"], check=True)
+        subprocess.run(["git", "commit", "-m", "Yeni haber hazirlandi (SahaEkrani Gorsel + Aciklama) [skip ci]"], check=True)
         subprocess.run(["git", "push"], check=True)
         print("Tum dosyalar GitHub'a kaydedildi!")
     except Exception as e:
@@ -114,33 +114,53 @@ def ozgunlestir(haber):
     return json.loads(temiz_metin)
 
 def resim_olustur(ai, gorsel):
-    print("Tasarim giydiriliyor...")
+    print("SahaEkrani tasarimi giydiriliyor...")
     sablon = """[html]
     [head]
     [style]
-        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;900&display=swap');
-        body { margin: 0; width: 1080px; height: 1080px; font-family: 'Montserrat', sans-serif; position: relative; overflow: hidden; background-color: #0b121d; }
-        .bg-image { position: absolute; top: -5%; left: -5%; width: 110%; height: 110%; background: url('IMG_URL') center/cover no-repeat; filter: blur(15px) brightness(0.35); z-index: 1; }
-        .container { position: relative; z-index: 2; height: 1080px; display: flex; flex-direction: column; justify-content: space-between; padding: 60px; box-sizing: border-box; }
-        .logo-container { font-size: 55px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
-        .logo-santra { color: #00e5ff; }
-        .logo-panosu { color: #ff7f00; }
-        .card { background-color: #0b121d; border-radius: 20px; padding: 50px; border-left: 12px solid #00e5ff; box-shadow: -5px 0px 40px rgba(0, 229, 255, 0.3); }
-        .badge { display: inline-block; background-color: #ff7f00; color: white; padding: 12px 24px; border-radius: 8px; font-weight: 700; font-size: 24px; margin-bottom: 30px; text-transform: uppercase; }
-        .title { color: white; font-size: 50px; font-weight: 900; line-height: 1.2; margin: 0 0 25px 0; text-transform: uppercase; }
-        .summary { color: #00e5ff; font-size: 32px; font-weight: 700; line-height: 1.4; margin: 0 0 25px 0; }
-        .desc { color: #d1d5db; font-size: 26px; font-weight: 500; line-height: 1.5; margin: 0; }
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,700;0,900&family=Oswald:wght@500;700&display=swap');
+        body, html { margin: 0; padding: 0; width: 1080px; height: 1080px; font-family: 'Montserrat', sans-serif; background-color: #161b22; display: flex; justify-content: center; align-items: center; overflow: hidden; }
+        .instagram-post { width: 1080px; height: 1080px; position: relative; background: linear-gradient(135deg, #161b22 0%, #1e252d 100%); color: white; box-sizing: border-box; padding: 60px; display: flex; flex-direction: column; z-index: 1; }
+        .bg-pattern { position: absolute; top: 0; left: 0; width: 1080px; height: 1080px; background-image: radial-gradient(circle at 50% 50%, rgba(53, 152, 219, 0.1) 0%, transparent 60%), linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px); background-size: 100% 100%, 50px 50px, 50px 50px; z-index: -2; }
+        .bg-image { position: absolute; top: -5%; left: -5%; width: 110%; height: 110%; background-color: #1a2026; background-image: url('IMG_URL'); background-size: cover; background-position: center; filter: blur(20px) brightness(0.25); z-index: -3; }
+        .header { display: flex; align-items: center; margin-bottom: 40px; z-index: 2; }
+        .logo-container { width: 180px; height: 180px; border-radius: 50%; overflow: hidden; border: 4px solid #3598db; box-shadow: 0 0 30px rgba(53, 152, 219, 0.4); background-color: #151a21; flex-shrink: 0; }
+        .logo-container img { width: 100%; height: 100%; object-fit: contain; }
+        .header-text { margin-left: 35px; }
+        .header-text h1 { font-family: 'Oswald', sans-serif; font-size: 75px; margin: 0; line-height: 0.95; text-transform: uppercase; letter-spacing: 2px; }
+        .text-green { color: #5ad54e; }
+        .text-white { color: #ffffff; }
+        .content-card { flex: 1; background: rgba(26, 32, 38, 0.6); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); border: 2px solid rgba(53, 152, 219, 0.25); border-radius: 30px; padding: 50px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 25px 50px rgba(0,0,0,0.6); position: relative; overflow: hidden; }
+        .content-card::before { content: ''; position: absolute; left: 0; top: 0; width: 12px; height: 100%; background: linear-gradient(to bottom, #5ad54e, #3598db); }
+        .category-badge { display: inline-block; background-color: #5ad54e; color: #161b22; font-weight: 900; font-size: 24px; padding: 8px 22px; border-radius: 8px; margin-bottom: 25px; text-transform: uppercase; align-self: flex-start; box-shadow: 0 0 20px rgba(90, 213, 78, 0.3); }
+        .news-title { font-size: 50px; font-weight: 900; line-height: 1.2; margin: 0 0 20px 0; text-transform: uppercase; color: #ffffff; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+        .news-body { font-size: 28px; line-height: 1.4; color: #e0e0e0; margin: 0; font-weight: 400; }
+        .footer { margin-top: 30px; display: flex; justify-content: flex-end; align-items: center; font-size: 24px; color: #7a8a99; font-weight: bold; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px; }
+        .footer-brand { color: #3598db; }
+        .watermark { position: absolute; bottom: -30px; right: -30px; font-size: 200px; font-weight: 900; color: rgba(255,255,255,0.02); z-index: 0; pointer-events: none; font-family: 'Oswald', sans-serif; text-transform: uppercase; }
     [/style]
     [/head]
     [body]
-        [div class='bg-image'][/div]
-        [div class='container']
-            [div class='logo-container'][span class='logo-santra']SANTRA[/span] [span class='logo-panosu']PANOSU[/span][/div]
-            [div class='card']
-                [div class='badge']SPOR GÜNDEMİ[/div]
-                [h1 class='title']BASLIK[/h1]
-                [h2 class='summary']OZET[/h2]
-                [p class='desc']ACIKLAMA[/p]
+        [div class='instagram-post']
+            [div class='bg-image'][/div]
+            [div class='bg-pattern'][/div]
+            [div class='watermark']SAHA[/div]
+            [div class='header']
+                [div class='logo-container']
+                    [img src='LOGO.jpeg' alt='Saha Ekrani Logo']
+                [/div]
+                [div class='header-text']
+                    [h1 class='text-green']SAHA[/h1]
+                    [h1 class='text-white']EKRANI[/h1]
+                [/div]
+            [/div]
+            [div class='content-card']
+                [div class='category-badge']SON DAKİKA[/div]
+                [h1 class='news-title']BASLIK[/h1]
+                [p class='news-body']OZET[/p>
+            [/div]
+            [div class='footer']
+                [span class='footer-brand']@sahaekrani[/span]
             [/div]
         [/div]
     [/body]
@@ -150,7 +170,6 @@ def resim_olustur(ai, gorsel):
     html_icerik = html_icerik.replace("IMG_URL", gorsel)
     html_icerik = html_icerik.replace("BASLIK", ai["baslik"])
     html_icerik = html_icerik.replace("OZET", ai["ozet"])
-    html_icerik = html_icerik.replace("ACIKLAMA", ai["aciklama"])
     
     with open("gecici.html", "w", encoding="utf-8") as f:
         f.write(html_icerik)
@@ -164,19 +183,19 @@ def resim_olustur(ai, gorsel):
         page.screenshot(path=yol, type="jpeg", quality=90)
         browser.close()
     
-    print("Resim olusturuldu:", yol)
+    print("SahaEkrani gorseli olusturuldu:", yol)
     return yol
 
 def aciklama_kaydet(ai):
     print("Aciklama dosyasi hazirlaniyor...")
-    caption = "🚨 " + ai['baslik'] + "\n\n" + ai['detayli_metin'] + "\n\n#Futbol #Spor #Transfer #Santra"
+    caption = "🚨 " + ai['baslik'] + "\n\n" + ai['detayli_metin'] + "\n\n#SahaEkrani #Futbol #Spor #Transfer"
     yol = os.path.join(os.getcwd(), "aciklama.txt")
     with open(yol, "w", encoding="utf-8") as f:
         f.write(caption)
     return yol
 
 if __name__ == "__main__":
-    print("---- SANTRA BOT BASLIYOR ----")
+    print("---- SAHA EKRANI BOT BASLIYOR ----")
     h = haberleri_cek()
     if h:
         ai_veri = ozgunlestir(h)
