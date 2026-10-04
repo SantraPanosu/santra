@@ -4,3 +4,4 @@ feedparser==6.0.10
 requests==2.31.0
 python-dotenv==1.0.0
 playwright==1.40.0
+Pillow>=8.1.1
