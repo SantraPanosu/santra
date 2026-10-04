@@ -1,23 +1,17 @@
-#!/usr/bin/env python3
-# haber_botu.py
-# RSS çek, HTML oluştur, screenshot al, Instagram'a yükle
-# Session reuse ve TOTP destekli
-
-import os
-import sys
-import tempfile
-import time
-import logging
-import random
-from datetime import datetime
-from pathlib import Path
-
-import feedparser
+import os, random, re, json, subprocess, time, feedparser
+from groq import Groq
 from playwright.sync_api import sync_playwright
-from instagrapi import Client
 
-# RSS kaynakları
-RSS_SOURCES = [
+IG_USERNAME = os.environ.get("IG_USERNAME")
+IG_PASSWORD = os.environ.get("IG_PASSWORD")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+
+if not GROQ_API_KEY or not IG_USERNAME or not IG_PASSWORD:
+    raise ValueError("HATA: Gerekli ortam degiskenleri (Secrets) eksik! Lutfen GitHub Secrets ayarlarini kontrol edin.")
+
+client = Groq(api_key=GROQ_API_KEY)
+
+RSS_KAYNAKLARI = [
     "https://www.fanatik.com.tr/rss/anasayfa",
     "https://www.fotomac.com.tr/rss/anasayfa.xml",
     "https://www.sporx.com/rss.php",
@@ -35,259 +29,166 @@ RSS_SOURCES = [
     "https://www.yenisafak.com/rss/spor"
 ]
 
-# Ayarlar
-OUTPUT_DIR = Path(tempfile.gettempdir()) / "haber_botu"
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-OUTPUT_IMAGE = OUTPUT_DIR / "haber.jpg"
-HTML_FILE = OUTPUT_DIR / "haber.html"
-LOG_LEVEL = logging.INFO
+YEDEK_GORSELLER = [
+    "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=1080",
+    "https://images.unsplash.com/photo-1518605368461-1e1e12db801b?q=80&w=1080",
+    "https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=1080",
+    "https://images.unsplash.com/photo-1522778119026-d647f0596c20?q=80&w=1080",
+    "https://images.unsplash.com/photo-1556056504-5c7696c4c28d?q=80&w=1080"
+]
 
-logging.basicConfig(
-    level=LOG_LEVEL,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)]
-)
+HAFIZA_DOSYASI = "paylasilanlar.json"
 
-def fetch_latest_entry(sources):
-    logging.info("RSS kaynaklarından haber çekiliyor...")
-    for url in sources:
+def gecmisi_yukle():
+    if os.path.exists(HAFIZA_DOSYASI):
+        with open(HAFIZA_DOSYASI, "r", encoding="utf-8") as f:
+            try:
+                return json.load(f)
+            except:
+                return []
+    return []
+
+def gecmiye_kaydet(baslik, resim_yolu):
+    paylasilanlar = gecmisi_yukle()
+    paylasilanlar.append(baslik)
+    if len(paylasilanlar) > 150:
+        paylasilanlar = paylasilanlar[-150:]
+    with open(HAFIZA_DOSYASI, "w", encoding="utf-8") as f:
+        json.dump(paylasilanlar, f, ensure_ascii=False, indent=4)
+    
+    try:
+        subprocess.run(["git", "config", "--global", "user.name", "SantraBot"], check=True)
+        subprocess.run(["git", "config", "--global", "user.email", "bot@santrapanosu.com"], check=True)
+        subprocess.run(["git", "add", HAFIZA_DOSYASI], check=True)
+        if os.path.exists(resim_yolu):
+            subprocess.run(["git", "add", resim_yolu], check=True)
+        subprocess.run(["git", "commit", "-m", "Hafiza ve gorsel guncellendi [skip ci]"], check=True)
+        subprocess.run(["git", "push"], check=True)
+        print("Hafıza ve GÖRSEL GitHub deposuna başarıyla kaydedildi!")
+    except Exception as e:
+        pass
+
+def haberleri_cek():
+    paylasilanlar = gecmisi_yukle()
+    toplanan_yeni_haberler = []
+    
+    for secilen_rss in RSS_KAYNAKLARI:
         try:
-            d = feedparser.parse(url)
-            if not d or not d.entries:
-                logging.debug("Kaynak boş veya parse edilemedi: %s", url)
+            feed = feedparser.parse(secilen_rss)
+            if not feed.entries:
                 continue
-            for entry in d.entries:
-                title = entry.get("title", "").strip()
-                link = entry.get("link", "").strip()
-                summary = entry.get("summary", entry.get("description", "")).strip()
-                published = entry.get("published", entry.get("updated", ""))
-                if not title or not link:
-                    continue
-                logging.info("Haber bulundu: %s (kaynak: %s)", title, url)
-                return {"title": title, "link": link, "summary": summary, "published": published}
-        except Exception as e:
-            logging.warning("RSS parse hatası %s: %s", url, e)
-    logging.info("Hiçbir uygun haber bulunamadı.")
-    return None
+                
+            for entry in feed.entries[:5]:
+                baslik = entry.title
+                if baslik not in paylasilanlar:
+                    gorsel_url = random.choice(YEDEK_GORSELLER)
+                    if 'media_content' in entry:
+                        gorsel_url = entry.media_content[0]['url']
+                    elif 'enclosures' in entry and len(entry.enclosures) > 0:
+                        gorsel_url = entry.enclosures[0]['href']
+                    elif 'links' in entry:
+                        for link in entry.links:
+                            if 'image' in link.get('type', ''):
+                                gorsel_url = link.href
+                                break
+                                
+                    aciklama_metni = entry.get('description', '')
+                    if not gorsel_url or gorsel_url in YEDEK_GORSELLER:
+                        img_match = re.search(r'src=["\'](https?://[^"\']+\.(?:jpg|jpeg|png|webp))["\']', aciklama_metni, re.IGNORECASE)
+                        if img_match:
+                            gorsel_url = img_match.group(1)
+                    
+                    toplanan_yeni_haberler.append({
+                        'orjinal_baslik': baslik,
+                        'orjinal_metin': aciklama_metni,
+                        'gorsel_url': gorsel_url
+                    })
+        except Exception:
+            pass
+            
+    if not toplanan_yeni_haberler:
+        return None
+        
+    return random.choice(toplanan_yeni_haberler)
 
-def render_html_for_entry(entry, html_path: Path):
-    title = entry.get("title", "")
-    summary = entry.get("summary", "")
-    link = entry.get("link", "")
-    published = entry.get("published", "")
-    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-    html = f"""<!doctype html>
-<html lang="tr">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>{title}</title>
-  <style>
-    body {{ font-family: Arial, Helvetica, sans-serif; margin:0; padding:0; background:#fff; color:#111; }}
-    .card {{ width:1200px; height:630px; padding:40px; box-sizing:border-box; display:flex; flex-direction:column; justify-content:space-between; }}
-    .title {{ font-size:48px; font-weight:700; line-height:1.05; margin-bottom:20px; }}
-    .summary {{ font-size:22px; color:#333; max-height:300px; overflow:hidden; }}
-    .meta {{ font-size:14px; color:#666; margin-top:20px; }}
-    .footer {{ font-size:12px; color:#999; }}
-    a {{ color:#1a73e8; text-decoration:none; }}
-  </style>
-</head>
-<body>
-  <div class="card">
-    <div>
-      <div class="title">{title}</div>
-      <div class="summary">{summary}</div>
-    </div>
-    <div>
-      <div class="meta">Kaynak: <a href="{link}">{link}</a></div>
-      <div class="footer">Oluşturuldu: {now} • Yayın tarihi: {published}</div>
-    </div>
-  </div>
-</body>
-</html>
-"""
-    html_path.write_text(html, encoding="utf-8")
-    logging.info("HTML dosyası oluşturuldu: %s", html_path)
+def yapay_zeka_ile_ozgunlestir(haber_verisi):
+    prompt = "Su haberi incele ve SADECE JSON formatinda ver. Baska hicbir kelime yazma: {\"baslik\":\"kisa\",\"ozet\":\"1 cumle\",\"aciklama\":\"kisa\",\"detayli_metin\":\"uzun\"}. Haber: " + haber_verisi['orjinal_baslik'] + " - " + haber_verisi['orjinal_metin']
+    
+    chat_completion = client.chat.completions.create(
+        messages=[{"role": "user", "content": prompt}],
+        model="openai/gpt-oss-120b",
+        max_completion_tokens=2048,
+        reasoning_effort="medium"
+    )
+    
+    cevap = chat_completion.choices[0].message.content
+    temiz_metin = cevap.replace("```json", "").replace("```", "").strip()
+    
+    json_match = re.search(r'\{.*?\}', temiz_metin.replace('\n', ''), re.IGNORECASE | re.DOTALL)
+    if json_match:
+        temiz_metin = json_match.group(0)
+        
+    return json.loads(temiz_metin)
 
-def make_screenshot_from_html(html_path: Path, output_image: Path):
-    logging.info("Playwright ile screenshot alınıyor...")
+def resim_olustur(ai_veri, gorsel_url):
+    html_icerik = "\x3Chtml\x3E\x3Cbody style=\"background:url('" + gorsel_url + "');background-size:cover;color:#fff;padding:50px;font-family:sans-serif;\"\x3E\x3Cdiv style=\"background:rgba(0,0,0,0.6);padding:40px;border-radius:20px;\"\x3E\x3Ch1 style=\"font-size:3.5em\"\x3E" + ai_veri["baslik"] + "\x3C/h1\x3E\x3Ch2 style=\"color:#f39c12;font-size:2.5em\"\x3E" + ai_veri["ozet"] + "\x3C/h2\x3E\x3Cp style=\"font-size:1.8em\"\x3E" + ai_veri["aciklama"] + "\x3C/p\x3E\x3C/div\x3E\x3C/body\x3E\x3C/html\x3E"
+    
+    with open("gecici.html", "w", encoding="utf-8") as f:
+        f.write(html_icerik)
+
+    yol = os.path.join(os.getcwd(), "santra_haber.jpg")
     with sync_playwright() as p:
         browser = p.chromium.launch(args=["--no-sandbox"])
-        context = browser.new_context(viewport={"width": 1200, "height": 630})
-        page = context.new_page()
-        page.goto("file://" + str(html_path.resolve()))
-        page.wait_for_load_state("networkidle")
-        try:
-            page.wait_for_function("document.fonts.ready.then(()=>true)", timeout=8000)
-        except Exception:
-            page.wait_for_timeout(500)
-        page.wait_for_timeout(300)
-        page.screenshot(path=str(output_image), type="jpeg", quality=90)
-        context.close()
+        page = browser.new_page(viewport={"width": 1080, "height": 1080})
+        page.goto("file://" + os.path.abspath("gecici.html"))
+        page.screenshot(path=yol, type="jpeg")
         browser.close()
-    logging.info("Screenshot alındı: %s", output_image)
+    return yol
 
-def post_to_instagram(image_path: Path, caption: str, username: str, password: str,
-                      max_retries: int = 6, base_delay: float = 30.0):
-    logging.info("Instagram'a giriş denemesi: %s", username)
-    cl = Client()
-    try:
-        cl.user_agent = "Instagram 300.1.0.39.119 Android (31/12; 480dpi; 1080x2400; Samsung; SM-G991B; SM-G991B; qcom; tr_TR)"
-    except Exception:
-        pass
-
-    def get_totp_code():
-        secret = os.environ.get("IG_2FA_SECRET")
-        if secret:
+def instagram_yukle(resim, ai):
+    caption = "🚨 " + ai['baslik'] + "\n\n" + ai['detayli_metin'] + "\n\n#Futbol #Spor #Transfer #Santra"
+    
+    with sync_playwright() as p:
+        b = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
+        
+        context = b.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            viewport={"width": 1280, "height": 800}
+        )
+        page = context.new_page()
+        
+        page.goto("https://www.instagram.com/accounts/login/", timeout=60000)
+        time.sleep(5)
+        
+        page.wait_for_selector("input[name='username']", timeout=15000)
+        page.locator("input[name='username']").fill(IG_USERNAME)
+        page.locator("input[name='password']").fill(IG_PASSWORD)
+        page.locator("button[type='submit']").click()
+        time.sleep(10)
+        
+        page.goto("https://www.instagram.com/create/style/", timeout=60000)
+        time.sleep(5)
+        
+        page.locator("input[type='file']").set_input_files(resim)
+        time.sleep(3)
+        
+        for _ in range(2):
             try:
-                import pyotp
-                return pyotp.TOTP(secret).now()
-            except Exception as e:
-                logging.warning("TOTP üretimi başarısız: %s", e)
-        manual = os.environ.get("IG_2FA_CODE")
-        if manual:
-            return manual
-        return None
-
-    def two_factor_callback(username_inner):
-        code = get_totp_code()
-        if code:
-            logging.info("TOTP kodu üretildi otomatik olarak.")
-            return code
-        logging.error("Two-factor kodu bulunamadı. IG_2FA_SECRET veya IG_2FA_CODE ayarla.")
-        raise Exception("Two-factor code not available in environment.")
-
-    def challenge_handler(username_inner, choice):
-        logging.error("Instagram challenge_required tetiklendi. Manuel müdahale gerekli.")
-        raise Exception("Instagram challenge_required: manual verification required.")
-
-    session_file = Path(tempfile.gettempdir()) / "ig_session.json"
-
-    for attempt in range(1, max_retries + 1):
-        try:
-            if session_file.exists():
-                logging.info("Kayıtlı session yükleniyor: %s", session_file)
-                cl.load_settings(str(session_file))
-
-            try:
-                cl.login(username, password, two_factor_callback=two_factor_callback, challenge_handler=challenge_handler)
-                logging.info("Instagram login başarılı (two_factor_callback).")
-                break
-            except TypeError as te:
-                msg = str(te).lower()
-                if "unexpected keyword" in msg or "two_factor_callback" in msg:
-                    logging.warning("two_factor_callback desteklenmiyor, fallback yöntemleri deneniyor.")
-                    code = get_totp_code()
-                    if code:
-                        try:
-                            cl.login(username, password, verification_code=code)
-                            logging.info("Instagram login başarılı (verification_code).")
-                            break
-                        except Exception as e_ver:
-                            logging.warning("verification_code ile login başarısız: %s", e_ver)
-                    try:
-                        code = get_totp_code()
-                        if code:
-                            try:
-                                cl.two_factor_login(username, password, code)
-                                logging.info("Instagram login başarılı (two_factor_login).")
-                                break
-                            except TypeError:
-                                try:
-                                    cl.two_factor_login(code)
-                                    logging.info("Instagram login başarılı (two_factor_login code-only).")
-                                    break
-                                except Exception as e_tf:
-                                    logging.warning("two_factor_login fallback başarısız: %s", e_tf)
-                    except Exception as e:
-                        logging.warning("two_factor_login denemesi hata verdi: %s", e)
-                    raise te
-                else:
-                    raise
-            except Exception as e:
-                raise
-
-        except Exception as e:
-            msg = str(e).lower()
-            logging.warning("Login denemesi %d başarısız: %s", attempt, msg)
-            if "out of date" in msg or "upgrade your app" in msg:
-                logging.error("Instagram uygulama sürümüyle ilgili hata: %s", msg)
-                logging.error("Öneriler: instagrapi sürümünü güncelle veya user_agent değiştir.")
-                raise
-            if "challenge_required" in msg:
-                logging.error("challenge_required: manuel doğrulama gerekli.")
-                raise
-            if "429" in msg or "too many" in msg or "rate" in msg:
-                delay = base_delay * (2 ** (attempt - 1)) + random.uniform(0, 3)
-                logging.warning("Rate limit benzeri hata. %s saniye bekleniyor (attempt %d).", delay, attempt)
-                time.sleep(delay)
-            else:
-                time.sleep(min(base_delay * attempt, 60))
-            if attempt == max_retries:
-                logging.error("Login için maksimum deneme sayısına ulaşıldı.")
-                raise
-
-    try:
-        cl.dump_settings(str(session_file))
-        logging.info("Session kaydedildi: %s", session_file)
-    except Exception:
-        logging.debug("Session kaydetme başarısız, devam ediliyor.")
-
-    for attempt in range(1, max_retries + 1):
-        try:
-            media = cl.photo_upload(str(image_path), caption)
-            logging.info("Yükleme başarılı. Media id: %s", getattr(media, "pk", "unknown"))
-            break
-        except Exception as e:
-            msg = str(e).lower()
-            logging.warning("Upload denemesi %d başarısız: %s", attempt, msg)
-            if "429" in msg or "too many" in msg or "rate" in msg:
-                delay = base_delay * (2 ** (attempt - 1)) + random.uniform(0, 3)
-                logging.warning("Upload rate limit. %s saniye bekleniyor (attempt %d).", delay, attempt)
-                time.sleep(delay)
-            else:
-                time.sleep(min(base_delay * attempt, 30))
-            if attempt == max_retries:
-                logging.error("Upload için maksimum deneme sayısına ulaşıldı.")
-                raise
-
-    try:
-        cl.logout()
-    except Exception:
-        pass
-
-def main():
-    logging.info("Bot başlatılıyor...")
-    ig_user = os.environ.get("IG_USERNAME")
-    ig_pass = os.environ.get("IG_PASSWORD")
-    if not ig_user or not ig_pass:
-        logging.error("IG_USERNAME veya IG_PASSWORD ortam değişkenleri eksik.")
-        sys.exit(1)
-
-    entry = fetch_latest_entry(RSS_SOURCES)
-    if not entry:
-        logging.info("Gönderilecek haber bulunamadı. Çıkılıyor.")
-        return
-
-    render_html_for_entry(entry, HTML_FILE)
-
-    try:
-        make_screenshot_from_html(HTML_FILE, OUTPUT_IMAGE)
-    except Exception as e:
-        logging.error("Screenshot alınırken hata: %s", e)
-        sys.exit(1)
-
-    title = entry.get("title", "")
-    link = entry.get("link", "")
-    caption = f"{title}\n\nKaynak: {link}"
-
-    try:
-        post_to_instagram(OUTPUT_IMAGE, caption, ig_user, ig_pass)
-    except Exception as e:
-        logging.error("Instagram'a yükleme başarısız: %s", e)
-        sys.exit(1)
-
-    logging.info("İşlem tamamlandı.")
+                page.locator("button:has-text('İleri'), button:has-text('Next')").click()
+                time.sleep(2)
+            except Exception:
+                pass
+                
+        page.locator("div[aria-label='Write a caption...'], textarea").fill(caption)
+        time.sleep(2)
+        page.locator("button:has-text('Paylaş'), button:has-text('Share')").click()
+        time.sleep(10)
+        b.close()
 
 if __name__ == "__main__":
-    main()
+    h = haberleri_cek()
+    if h:
+        ai_veri = yapay_zeka_ile_ozgunlestir(h)
+        resim = resim_olustur(ai_veri, h['gorsel_url'])
+        gecmiye_kaydet(h['orjinal_baslik'], resim)
+        instagram_yukle(resim, ai_veri)
