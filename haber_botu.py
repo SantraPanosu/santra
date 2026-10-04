@@ -1,4 +1,4 @@
-import os, random, re, json, subprocess, time, feedparser, difflib
+import os, random, re, json, subprocess, time, feedparser, difflib, calendar
 from groq import Groq
 from playwright.sync_api import sync_playwright
 
@@ -25,17 +25,11 @@ RSS_KAYNAKLARI = [
 
 HAFIZA_DOSYASI = "paylasilanlar.json"
 
-# Yasaklı kelimeler filtresi (Bahis, misli, iddaa vb.)
+# Yasaklı kelimeler filtresi (Bahis, iddaa, maç saatleri, tv rehberi vb.)
 YASAKLI_KELIMELER = [
-    "misli",
-    "iddaa",
-    "bahis",
-    "kupon",
-    "oran",
-    "casino",
-    "slot",
-    "yatırım",
-    "bonus"
+    "misli", "iddaa", "bahis", "kupon", "oran", "casino", "slot", "yatırım", "bonus",
+    "hangi kanalda", "saat kaçta", "şifresiz", "canlı yayın", "canlı izle", 
+    "yayınlanacak", "naklen", "ekranlarında", "yayın akışı", "maç programı"
 ]
 
 def gecmisi_yukle():
@@ -133,16 +127,27 @@ def benzer_mi(yeni_baslik, gecmis_listesi):
     return False
 
 def haberleri_cek():
-    print("Haberler taraniyor, resimsiz ve kopya olanlar eleniyor...")
+    print("Haberler taraniyor, eski, resimsiz ve kopya olanlar eleniyor...")
 
     paylasilanlar = gecmisi_yukle()
     haberler = []
+    su_an = time.time()
 
     for rss in RSS_KAYNAKLARI:
         try:
             feed = feedparser.parse(rss)
 
             for entry in feed.entries[:8]:
+                # ZAMAN KONTROLÜ (En fazla 13 saatlik haberler alınır)
+                if hasattr(entry, 'published_parsed') and entry.published_parsed:
+                    yayin_zamani = calendar.timegm(entry.published_parsed)
+                    fark_saat = (su_an - yayin_zamani) / 3600.0
+                    
+                    if fark_saat > 13 or fark_saat < -24:
+                        continue # Haber 13 saatten eski veya hatalı zamanlıysa atla
+                else:
+                    continue # Tarihi gizlenmiş, eski olma ihtimali olan haberi riske atma
+
                 baslik = entry.title.strip()
                 aciklama = entry.get(
                     'description',
@@ -213,7 +218,7 @@ def haberleri_cek():
 
     if not haberler:
         print(
-            "UYARI: Paylasilacak, resimli, yeni ve uygun haber bulunamadi!"
+            "UYARI: Paylasilacak (son 13 saate ait), resimli ve uygun haber bulunamadi!"
         )
         return None
 
@@ -226,18 +231,20 @@ def haberleri_cek():
         secilen = random.choice(haberler)
 
     print(
-        "SECILEN TEMIZ VE RESIMLI HABER: "
+        "SECILEN TAZE, TEMIZ VE RESIMLI HABER: "
         + secilen['baslik']
     )
 
     return secilen
 
 def ozgunlestir(haber):
-    print("Groq yapay zeka devrede (Kesin Doğruluk Modu)...")
+    print("Groq yapay zeka devrede (Katı Gerçeklik Modu)...")
 
     prompt = (
-        "Sen profesyonel ve güvenilir bir spor editörüsün. Aşağıdaki haberi incele ve KESİNLİKLE kafandan uydurma bilgi, transfer veya rakam eklemeden SADECE JSON formatinda ver. "
-        "Baska hicbir kelime yazma: "
+        "Sen profesyonel ve kesinlikle yalan/uydurma haber yapmayan bir spor editörüsün. "
+        "Aşağıdaki haberi incele. KESİNLİKLE kafandan eski teknik direktör, uydurma transfer, yalan bilgi veya rakam EKLEME. "
+        "Haberde kimden ve hangi olaydan bahsediliyorsa sadece onu yaz, yorum katma. "
+        "SADECE JSON formatinda ver, baska hicbir kelime yazma: "
         "{\"baslik\":\"kisa\",\"ozet\":\"1 cumle\","
         "\"aciklama\":\"kisa\","
         "\"detayli_metin\":\"uzun\"}. Haber: "
