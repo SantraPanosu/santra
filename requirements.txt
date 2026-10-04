@@ -1,5 +1,5 @@
 groq==1.7.0
-instagrapi==1.22.0
+instagrapi==1.19.1
 feedparser==6.0.10
 requests==2.31.0
 python-dotenv==1.0.0
