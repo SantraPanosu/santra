@@ -1,17 +1,23 @@
 # bot.py
 import os
-import random
 import re
 import json
-import subprocess
 import time
+import random
 import logging
+import shutil
+import subprocess
+import html
+from pathlib import Path
 from datetime import datetime
 import feedparser
+import requests
+
 from groq import Groq
 from instagrapi import Client
-from instagrapi.exceptions import ClientError, ClientLoginRequired
+from instagrapi.exceptions import ClientError
 from requests.exceptions import RequestException
+from playwright.sync_api import sync_playwright
 
 # --- Logging ---
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -21,7 +27,7 @@ IG_USERNAME = os.environ.get("IG_USERNAME")
 IG_PASSWORD = os.environ.get("IG_PASSWORD")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
-GITHUB_REPOSITORY = os.environ.get("GITHUB_REPOSITORY")  # owner/repo, Actions sağlar
+GITHUB_REPOSITORY = os.environ.get("GITHUB_REPOSITORY")
 
 if not IG_USERNAME or not IG_PASSWORD or not GROQ_API_KEY:
     logging.error("HATA: IG_USERNAME, IG_PASSWORD veya GROQ_API_KEY eksik.")
@@ -39,18 +45,25 @@ RSS_KAYNAKLARI = [
 
 YEDEK = ["https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=1080"]
 HAFIZA = "paylasilanlar.json"
+DESIGN_TEMPLATE = "design.html"
+FILLED_HTML = "design_filled.html"
+OUTPUT_IMAGE = "santra_haber.jpg"
+LOCAL_BG = "bg_image.jpg"
 SESSION_FILE = "ig_session.json"
 MAX_HISTORY = 150
 
-# --- Yardımcılar ---
+# --- Yardımcı fonksiyonlar ---
+def safe_load_json(path):
+    if not os.path.exists(path):
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return []
+
 def gecmisi_yukle():
-    if os.path.exists(HAFIZA):
-        try:
-            with open(HAFIZA, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return []
-    return []
+    return safe_load_json(HAFIZA)
 
 def gecmiye_kaydet(baslik, resim_yolu):
     paylasilanlar = gecmisi_yukle()
@@ -83,7 +96,7 @@ def haberleri_cek():
     for rss in RSS_KAYNAKLARI:
         try:
             feed = feedparser.parse(rss)
-            for entry in feed.entries[:5]:
+            for entry in feed.entries[:6]:
                 title = getattr(entry, "title", None)
                 if not title or title in paylasilanlar:
                     continue
@@ -106,7 +119,7 @@ def haberleri_cek():
         return None
     return random.choice(haberler)
 
-# AI JSON parse güvenli
+# --- AI parse güvenli ---
 def parse_ai_json(cevap):
     s = cevap.replace("```json", "").replace("```", "").strip()
     match = re.search(r'\{.*\}', s, re.DOTALL)
@@ -141,35 +154,89 @@ def ozgunlestir(haber):
         logging.error("AI ozgunlestirme hatasi: %s", e)
         raise
 
-# Basit HTML render + screenshot için Playwright yerine remote image kullanmayi tercih ediyoruz.
-# Burada sadece local bir basit HTML olusturup browserless ile screenshot almak yerine
-# instagrapi ile direkt fotoğraf yukleyecegiz. Bu fonksiyon gorseli indirip basit bir overlay yapar.
-def gorsel_indir_ve_hazirla(url, hedef="santra_haber.jpg"):
-    import requests
+# --- Görsel indirme ve design entegrasyonu ---
+def indir(url, hedef):
     try:
-        r = requests.get(url, timeout=15)
+        r = requests.get(url, timeout=20, stream=True)
         r.raise_for_status()
         with open(hedef, "wb") as f:
-            f.write(r.content)
-        return hedef
+            shutil.copyfileobj(r.raw, f)
+        return True
     except Exception as e:
-        logging.warning("Gorsel indirilemedi, yedek kullaniliyor: %s", e)
-        # yedek resim URL'sinden indir
-        try:
-            r = requests.get(YEDEK[0], timeout=15)
-            r.raise_for_status()
-            with open(hedef, "wb") as f:
-                f.write(r.content)
-            return hedef
-        except Exception as e2:
-            logging.error("Yedek resim de indirilemedi: %s", e2)
-            raise
+        logging.warning("Indirme hatasi %s -> %s : %s", url, hedef, e)
+        return False
 
-# Instagram yukleme - instagrapi ile
+def prepare_background(gorsel_url):
+    if not gorsel_url:
+        gorsel_url = YEDEK[0]
+    ok = indir(gorsel_url, LOCAL_BG)
+    if not ok:
+        indir(YEDEK[0], LOCAL_BG)
+    return os.path.abspath(LOCAL_BG)
+
+def html_escape(s, limit=None):
+    if s is None:
+        return ""
+    if limit:
+        s = s[:limit]
+    return html.escape(s)
+
+def fill_design(ai, bg_local_path):
+    if not os.path.exists(DESIGN_TEMPLATE):
+        raise FileNotFoundError(f"{DESIGN_TEMPLATE} bulunamadi. Tasarimi repo'ya ekle.")
+    with open(DESIGN_TEMPLATE, "r", encoding="utf-8") as f:
+        tpl = f.read()
+    # Replace placeholders safely
+    bg_url = "file://" + bg_local_path.replace("\\", "/")
+    filled = tpl.replace("ARKA_PLAN_GORSELI_BURAYA", bg_url)
+    filled = filled.replace("BASLIK_BURAYA", html_escape(ai.get("baslik",""), 220))
+    filled = filled.replace("OZET_BURAYA", html_escape(ai.get("ozet",""), 200))
+    filled = filled.replace("ACIKLAMA_BURAYA", html_escape(ai.get("aciklama",""), 800))
+    with open(FILLED_HTML, "w", encoding="utf-8") as f:
+        f.write(filled)
+    return os.path.abspath(FILLED_HTML)
+
+def resim_olustur_from_design(ai, gorsel_url):
+    bg_path = prepare_background(gorsel_url)
+    html_path = fill_design(ai, bg_path)
+    with sync_playwright() as p:
+        browser = p.chromium.launch(args=["--no-sandbox"], headless=True)
+        page = browser.new_page(viewport={"width": 1080, "height": 1080})
+        page.goto("file://" + html_path)
+        page.wait_for_load_state("networkidle")
+        page.wait_for_timeout(400)
+        page.screenshot(path=OUTPUT_IMAGE, type="jpeg", quality=90)
+        browser.close()
+    return os.path.abspath(OUTPUT_IMAGE)
+
+# --- Hashtag üretimi (basit, keşfete düşme amaçlı) ---
+def generate_hashtags(title, extra_tags=None, max_tags=8):
+    extra_tags = extra_tags or []
+    words = re.findall(r'\w{4,}', title, flags=re.UNICODE)
+    freq = {}
+    for w in words:
+        w_clean = re.sub(r'[^A-Za-z0-9ÇĞİÖŞÜçğıöşü]', '', w).lower()
+        if len(w_clean) < 3:
+            continue
+        freq[w_clean] = freq.get(w_clean, 0) + 1
+    sorted_words = sorted(freq.items(), key=lambda x: (-x[1], x[0]))
+    tags = [f"#{w[0].capitalize()}" for w in sorted_words[:3]]
+    fixed = ["#Futbol", "#Spor", "#Transfer"]
+    tags = tags + fixed + extra_tags
+    # ensure unique and limit
+    seen = []
+    for t in tags:
+        if t not in seen:
+            seen.append(t)
+        if len(seen) >= max_tags:
+            break
+    return " ".join(seen)
+
+# --- Instagram yükleme (instagrapi) ---
 def instagram_yukle_instagrapi(resim, ai, max_retries=3):
-    caption = "🚨 " + ai.get('baslik','') + "\n\n" + ai.get('detayli_metin','') + "\n\n#Futbol #Spor #Transfer"
+    caption_body = ai.get('detayli_metin','') or ai.get('aciklama','') or ai.get('ozet','')
+    caption = "🚨 " + ai.get('baslik','') + "\n\n" + caption_body + "\n\n" + generate_hashtags(ai.get('baslik',''))
     cl = Client()
-    # Session dosyasi ile tekrar login onlemek
     try:
         if os.path.exists(SESSION_FILE):
             cl.load_settings(SESSION_FILE)
@@ -179,7 +246,6 @@ def instagram_yukle_instagrapi(resim, ai, max_retries=3):
             cl.dump_settings(SESSION_FILE)
     except Exception as e:
         logging.warning("IG login sorunu: %s", e)
-        # Yine de denemeye devam
 
     attempt = 0
     while attempt < max_retries:
@@ -198,7 +264,7 @@ def instagram_yukle_instagrapi(resim, ai, max_retries=3):
     logging.error("Instagram yukleme basarisiz, tum denemeler tukenmis.")
     return False
 
-# Main akis
+# --- Main akış ---
 def main():
     logging.info("Bot basladi.")
     haber = haberleri_cek()
@@ -213,15 +279,13 @@ def main():
         return
 
     try:
-        resim = gorsel_indir_ve_hazirla(haber.get('gorsel'))
-    except Exception:
-        logging.error("Gorsel hazirlanamadi.")
+        resim = resim_olustur_from_design(ai_veri, haber.get('gorsel'))
+    except Exception as e:
+        logging.error("Resim olusturma hatasi: %s", e)
         return
 
-    # Hafizaya kaydet ve push
     gecmiye_kaydet(haber['baslik'], resim)
 
-    # Instagram yukle
     ok = instagram_yukle_instagrapi(resim, ai_veri)
     if ok:
         logging.info("Islem tamamlandi: %s", haber['baslik'])
