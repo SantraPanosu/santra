@@ -217,7 +217,13 @@ def haberleri_cek():
         )
         return None
 
-    secilen = random.choice(haberler)
+    # GİZLİ TAKIM ÖNCELİĞİ (Beşiktaş haberi varsa ilk onu seçer)
+    ozel_liste = [h for h in haberler if "beşiktaş" in h['baslik'].lower() or "besiktas" in h['baslik'].lower()]
+    
+    if ozel_liste:
+        secilen = random.choice(ozel_liste)
+    else:
+        secilen = random.choice(haberler)
 
     print(
         "SECILEN TEMIZ VE RESIMLI HABER: "
