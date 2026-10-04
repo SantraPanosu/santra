@@ -124,7 +124,7 @@ def ozgunlestir(haber):
     return json.loads(temiz_metin)
 
 def resim_olustur(ai, gorsel):
-    print("SahaEkrani tasarimi oluşturuluyor...")
+    print("SahaEkrani tasarimi şablondan oluşturuluyor...")
     
     logo_base64 = ""
     if os.path.exists("LOGO.jpeg"):
@@ -132,41 +132,26 @@ def resim_olustur(ai, gorsel):
             logo_base64 = base64.b64encode(f.read()).decode('utf-8')
     logo_src = f"data:image/jpeg;base64,{logo_base64}" if logo_base64 else ""
 
-    html_content = """
+    # template.html dosyasını oku
+    with open("template.html", "r", encoding="utf-8") as f:
+        html_content = f.read()
 
+    html_content = html_content.replace("IMG_URL_PLACEHOLDER", gorsel)
+    html_content = html_content.replace("LOGO_SRC_PLACEHOLDER", logo_src)
+    html_content = html_content.replace("BASLIK_PLACEHOLDER", ai["baslik"])
+    html_content = html_content.replace("OZET_PLACEHOLDER", ai["ozet"])
 
+    yol = os.path.join(os.getcwd(), "santra_haber.jpg")
+    with sync_playwright() as p:
+        browser = p.chromium.launch(args=["--no-sandbox"])
+        page = browser.new_page(viewport={"width": 1080, "height": 1080})
+        page.set_content(html_content)
+        page.wait_for_timeout(2500)
+        page.screenshot(path=yol, type="jpeg", quality=90)
+        browser.close()
     
-    SahaEkranı
-    
-
-SAHA
-
-SAHA
-EKRANI
-SON DAKİKA
-
-BASLIK_PLACEHOLDER
-OZET_PLACEHOLDER
-
-"""
-
-html_content = html_content.replace("IMG_URL_PLACEHOLDER", gorsel)
-html_content = html_content.replace("LOGO_SRC_PLACEHOLDER", logo_src)
-html_content = html_content.replace("BASLIK_PLACEHOLDER", ai["baslik"])
-html_content = html_content.replace("OZET_PLACEHOLDER", ai["ozet"])
-
-yol = os.path.join(os.getcwd(), "santra_haber.jpg")
-with sync_playwright() as p:
-    browser = p.chromium.launch(args=["--no-sandbox"])
-    page = browser.new_page(viewport={"width": 1080, "height": 1080})
-    page.set_content(html_content)
-    page.wait_for_timeout(2500)
-    page.screenshot(path=yol, type="jpeg", quality=90)
-    browser.close()
-
-print("SahaEkrani gorseli olusturuldu:", yol)
-return yol
-
+    print("SahaEkrani gorseli olusturuldu:", yol)
+    return yol
 
 def aciklama_kaydet(ai):
     print("Aciklama dosyasi hazirlaniyor...")
@@ -175,7 +160,6 @@ def aciklama_kaydet(ai):
     with open(yol, "w", encoding="utf-8") as f:
         f.write(caption)
     return yol
-
 
 if __name__ == "__main__":
     print("---- SAHA EKRANI BOT BASLIYOR ----")
