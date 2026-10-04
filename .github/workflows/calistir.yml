@@ -1,7 +1,7 @@
 name: Instagram Auto Post
 on:
   schedule:
-    - cron: '*/30 * * * *' # her 30 dakika
+    - cron: '*/30 * * * *'
   workflow_dispatch: {}
 
 jobs:
@@ -14,7 +14,9 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          playwright install --with-deps
       - name: Run bot
         env:
           IG_USERNAME: ${{ secrets.IG_USERNAME }}
