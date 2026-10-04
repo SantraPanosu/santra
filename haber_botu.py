@@ -213,8 +213,7 @@ except Exception:
 page.wait_for_timeout(300)
 
 page.screenshot(path=OUTPUT_IMAGE, type="jpeg", quality=90)
-
-        page.screenshot(path=OUTPUT_IMAGE, type="jpeg", quality=90)
+     page.screenshot(path=OUTPUT_IMAGE, type="jpeg", quality=90)
         browser.close()
     return os.path.abspath(OUTPUT_IMAGE)
 
