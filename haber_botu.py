@@ -40,7 +40,7 @@ def gecmisi_yukle():
     return []
 
 def gecmiye_kaydet(baslik, resim_yolu, aciklama_yolu):
-    print("Hafiza dan dosyalar guncelleniyor...")
+    print("Hafiza ve dosyalar guncelleniyor...")
     paylasilanlar = gecmisi_yukle()
     paylasilanlar.append(baslik)
     if len(paylasilanlar) > 150: paylasilanlar = paylasilanlar[-150:]
@@ -119,21 +119,21 @@ def resim_olustur(ai, gorsel):
     [style]
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,700;0,900&family=Oswald:wght@500;700&display=swap');
         body, html { margin: 0; padding: 0; width: 1080px; height: 1080px; font-family: 'Montserrat', sans-serif; background-color: #161b22; display: flex; justify-content: center; align-items: center; overflow: hidden; }
-        .instagram-post { width: 1080px; height: 1080px; position: relative; background: linear-gradient(135deg, rgba(22,27,34,0.85) 0%, rgba(30,37,45,0.85) 100%); color: white; box-sizing: border-box; padding: 50px 60px 60px 60px; display: flex; flex-direction: column; z-index: 1; }
+        .instagram-post { width: 1080px; height: 1080px; position: relative; background: linear-gradient(135deg, rgba(22,27,34,0.75) 0%, rgba(30,37,45,0.75) 100%); color: white; box-sizing: border-box; padding: 40px 60px 50px 60px; display: flex; flex-direction: column; z-index: 1; }
         .bg-pattern { position: absolute; top: 0; left: 0; width: 1080px; height: 1080px; background-image: radial-gradient(circle at 50% 50%, rgba(53, 152, 219, 0.1) 0%, transparent 60%), linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px); background-size: 100% 100%, 50px 50px, 50px 50px; z-index: -2; }
-        .bg-image { position: absolute; top: -10%; left: -10%; width: 120%; height: 120%; background: url('IMG_URL') center/cover no-repeat; filter: blur(22px) brightness(0.28); z-index: -3; }
-        .header { display: flex; align-items: center; margin-bottom: 30px; z-index: 2; }
-        .logo-container { width: 170px; height: 170px; border-radius: 50%; overflow: hidden; border: 4px solid #3598db; box-shadow: 0 0 30px rgba(53, 152, 219, 0.4); background-color: #151a21; flex-shrink: 0; }
+        .bg-image { position: absolute; top: -10%; left: -10%; width: 120%; height: 120%; background: url('IMG_URL') center/cover no-repeat; filter: blur(20px) brightness(0.32); z-index: -3; }
+        .header { display: flex; align-items: center; margin-bottom: 20px; z-index: 2; }
+        .logo-container { width: 150px; height: 150px; border-radius: 50%; overflow: hidden; border: 4px solid #3598db; box-shadow: 0 0 30px rgba(53, 152, 219, 0.4); background-color: #151a21; flex-shrink: 0; }
         .logo-container img { width: 100%; height: 100%; object-fit: contain; }
-        .header-text { margin-left: 35px; }
-        .header-text h1 { font-family: 'Oswald', sans-serif; font-size: 72px; margin: 0; line-height: 0.95; text-transform: uppercase; letter-spacing: 2px; }
+        .header-text { margin-left: 30px; }
+        .header-text h1 { font-family: 'Oswald', sans-serif; font-size: 64px; margin: 0; line-height: 0.95; text-transform: uppercase; letter-spacing: 2px; }
         .text-green { color: #5ad54e; }
         .text-white { color: #ffffff; }
-        .content-card { flex: 1; background: rgba(26, 32, 38, 0.75); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); border: 2px solid rgba(53, 152, 219, 0.25); border-radius: 30px; padding: 50px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 25px 50px rgba(0,0,0,0.6); position: relative; overflow: hidden; margin-top: 10px; }
+        .content-card { flex: 1; background: rgba(26, 32, 38, 0.75); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); border: 2px solid rgba(53, 152, 219, 0.25); border-radius: 30px; padding: 45px 50px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 25px 50px rgba(0,0,0,0.6); position: relative; overflow: hidden; margin-top: 5px; }
         .content-card::before { content: ''; position: absolute; left: 0; top: 0; width: 12px; height: 100%; background: linear-gradient(to bottom, #5ad54e, #3598db); }
-        .category-badge { display: inline-block; background-color: #5ad54e; color: #161b22; font-weight: 900; font-size: 24px; padding: 8px 22px; border-radius: 8px; margin-bottom: 25px; text-transform: uppercase; align-self: flex-start; box-shadow: 0 0 20px rgba(90, 213, 78, 0.3); }
-        .news-title { font-size: 48px; font-weight: 900; line-height: 1.2; margin: 0 0 20px 0; text-transform: uppercase; color: #ffffff; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
-        .news-body { font-size: 28px; line-height: 1.4; color: #e0e0e0; margin: 0; font-weight: 400; }
+        .category-badge { display: inline-block; background-color: #5ad54e; color: #161b22; font-weight: 900; font-size: 24px; padding: 8px 22px; border-radius: 8px; margin-bottom: 20px; text-transform: uppercase; align-self: flex-start; box-shadow: 0 0 20px rgba(90, 213, 78, 0.3); }
+        .news-title { font-size: 46px; font-weight: 900; line-height: 1.2; margin: 0 0 18px 0; text-transform: uppercase; color: #ffffff; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+        .news-body { font-size: 27px; line-height: 1.4; color: #e0e0e0; margin: 0; font-weight: 400; }
         .watermark { position: absolute; bottom: -30px; right: -30px; font-size: 200px; font-weight: 900; color: rgba(255,255,255,0.02); z-index: 0; pointer-events: none; font-family: 'Oswald', sans-serif; text-transform: uppercase; }
     [/style]
     [/head]
