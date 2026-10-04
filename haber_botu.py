@@ -30,7 +30,6 @@ YEDEK_GORSELLER = [
 ]
 
 HAFIZA_DOSYASI = "paylasilanlar.json"
-
 YASAKLI_KELIMELER = ["misli", "iddaa", "bahis", "kupon", "oran", "casino", "slot", "yatırım", "bonus", "günün maçları", "hangi kanalda", "saat kaçta"]
 
 def gecmisi_yukle():
@@ -125,30 +124,46 @@ def ozgunlestir(haber):
     return json.loads(temiz_metin)
 
 def resim_olustur(ai, gorsel):
-    print("SahaEkrani tasarimi giydiriliyor...")
-    sablon = """[html]
-    [head]
-    [style]
-        @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,700;0,900&family=Oswald:wght@500;700&display=swap');
-        body, html { margin: 0; padding: 0; width: 1080px; height: 1080px; font-family: 'Montserrat', sans-serif; background-color: #161b22; display: flex; justify-content: center; align-items: center; overflow: hidden; }
-        .instagram-post { width: 1080px; height: 1080px; position: relative; background: transparent; color: white; box-sizing: border-box; padding: 45px 60px 50px 60px; display: flex; flex-direction: column; justify-content: space-between; z-index: 1; }
-        .bg-image { position: absolute; top: -10%; left: -10%; width: 120%; height: 120%; background: url('IMG_URL') center/cover no-repeat; filter: blur(5px) brightness(0.52); z-index: -3; }
-        .header { display: flex; align-items: center; z-index: 2; }
-        .logo-container { width: 150px; height: 150px; border-radius: 50%; overflow: hidden; border: 4px solid #3598db; box-shadow: 0 0 30px rgba(53, 152, 219, 0.4); background-color: #151a21; flex-shrink: 0; }
-        .logo-container img { width: 100%; height: 100%; object-fit: contain; }
-        .header-text { margin-left: 30px; }
-        .header-text h1 { font-family: 'Oswald', sans-serif; font-size: 64px; margin: 0; line-height: 0.95; text-transform: uppercase; letter-spacing: 2px; }
-        .text-green { color: #5ad54e; }
-        .text-white { color: #ffffff; }
-        .content-card { width: 100%; height: 500px; background: rgba(22, 27, 34, 0.85); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border: 2px solid rgba(53, 152, 219, 0.3); border-radius: 30px; padding: 35px 45px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 25px 50px rgba(0,0,0,0.6); position: relative; overflow: hidden; box-sizing: border-box; }
-        .content-card::before { content: ''; position: absolute; left: 0; top: 0; width: 12px; height: 100%; background: linear-gradient(to bottom, #5ad54e, #3598db); }
-        .category-badge { display: inline-block; background-color: #5ad54e; color: #161b22; font-weight: 900; font-size: 20px; padding: 5px 18px; border-radius: 8px; margin-bottom: 15px; text-transform: uppercase; align-self: flex-start; box-shadow: 0 0 20px rgba(90, 213, 78, 0.3); }
-        .news-title { font-size: 40px; font-weight: 900; line-height: 1.2; margin: 0 0 15px 0; text-transform: uppercase; color: #ffffff; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
-        .news-body { font-size: 24px; line-height: 1.4; color: #e0e0e0; margin: 0; font-weight: 400; }
-        .watermark { position: absolute; bottom: -30px; right: -30px; font-size: 200px; font-weight: 900; color: rgba(255,255,255,0.02); z-index: 0; pointer-events: none; font-family: 'Oswald', sans-serif; text-transform: uppercase; }
-    [/style]
-    [/head]
-    [body]
-        [div class='instagram-post']
-            [div class='bg-image'][/div]
-            [div class='watermark']SAHA
+    print("SahaEkrani tasarimi template.html üzerinden giydiriliyor...")
+    
+    # template.html dosyasını oku
+    with open("template.html", "r", encoding="utf-8") as f:
+        html_icerik = f.read()
+    
+    # Değişkenleri yerine yerleştir
+    html_icerik = html_icerik.replace("IMG_URL", gorsel)
+    html_icerik = html_icerik.replace("BASLIK", ai["baslik"])
+    html_icerik = html_icerik.replace("OZET", ai["ozet"])
+    
+    with open("gecici.html", "w", encoding="utf-8") as f:
+        f.write(html_icerik)
+
+    yol = os.path.join(os.getcwd(), "santra_haber.jpg")
+    with sync_playwright() as p:
+        browser = p.chromium.launch(args=["--no-sandbox"])
+        page = browser.new_page(viewport={"width": 1080, "height": 1080})
+        page.goto("file://" + os.path.abspath("gecici.html"), wait_until="networkidle")
+        page.wait_for_timeout(2500)
+        page.screenshot(path=yol, type="jpeg", quality=90)
+        browser.close()
+    
+    print("SahaEkrani gorseli olusturuldu:", yol)
+    return yol
+
+def aciklama_kaydet(ai):
+    print("Aciklama dosyasi hazirlaniyor...")
+    caption = "🚨 " + ai['baslik'] + "\n\n" + ai['detayli_metin'] + "\n\n#SahaEkrani #Futbol #Spor #Transfer"
+    yol = os.path.join(os.getcwd(), "aciklama.txt")
+    with open(yol, "w", encoding="utf-8") as f:
+        f.write(caption)
+    return yol
+
+if __name__ == "__main__":
+    print("---- SAHA EKRANI BOT BASLIYOR ----")
+    h = haberleri_cek()
+    if h:
+        ai_veri = ozgunlestir(h)
+        resim = resim_olustur(ai_veri, h['gorsel'])
+        aciklama = aciklama_kaydet(ai_veri)
+        gecmiye_kaydet(h['baslik'], resim, aciklama)
+    print("---- ISLEM BITTI ----")
