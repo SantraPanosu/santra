@@ -135,7 +135,9 @@ def gecmiye_kaydet(baslik, resim_yolu, aciklama_yolu):
 
 
 def haberleri_cek():
-    print("Tum RSS siteleri tek tek taranıyor ve en yeniler filtreleniyor...")
+    print(
+        "Tum RSS siteleri tek tek taranıyor ve en yeniler filtreleniyor..."
+    )
 
     paylasilanlar = gecmisi_yukle()
     tum_adaylar = []
@@ -160,13 +162,22 @@ def haberleri_cek():
                 if not yasakli_varmi and baslik not in paylasilanlar:
                     gorsel_url = None
 
-                    if hasattr(entry, 'media_content') and entry.media_content:
+                    if (
+                        hasattr(entry, 'media_content')
+                        and entry.media_content
+                    ):
                         gorsel_url = entry.media_content[0].get('url')
 
-                    elif hasattr(entry, 'media_thumbnail') and entry.media_thumbnail:
+                    elif (
+                        hasattr(entry, 'media_thumbnail')
+                        and entry.media_thumbnail
+                    ):
                         gorsel_url = entry.media_thumbnail[0].get('url')
 
-                    elif hasattr(entry, 'enclosures') and entry.enclosures:
+                    elif (
+                        hasattr(entry, 'enclosures')
+                        and entry.enclosures
+                    ):
                         for enc in entry.enclosures:
                             if 'image' in enc.get('type', ''):
                                 gorsel_url = enc.get('href')
@@ -201,11 +212,16 @@ def haberleri_cek():
                         )
 
         except Exception as e:
-            print(f"RSS tarama hatasi ({rss}):", e)
+            print(
+                f"RSS tarama hatasi ({rss}):",
+                e
+            )
             pass
 
     if not tum_adaylar:
-        print("UYARI: Paylasilmamis yeni haber bulunamadi!")
+        print(
+            "UYARI: Paylasilmamis yeni haber bulunamadi!"
+        )
         return None
 
     secilen = tum_adaylar[0]
@@ -219,7 +235,9 @@ def haberleri_cek():
 
 
 def ozgunlestir(haber):
-    print("Groq yapay zeka devrede (Kesin Gerçeklik Modu)...")
+    print(
+        "Groq yapay zeka devrede (Kesin Gerçeklik Modu)..."
+    )
 
     prompt = (
         "Sen profesyonel bir spor editörüsün. Aşağıdaki güncel haberi incele. "
@@ -227,7 +245,10 @@ def ozgunlestir(haber):
         "Sadece verilen kaynak metindeki gerçekleri baz alarak düzenle. "
         "SADECE JSON formatinda ver, baska hicbir kelime yazma: "
         "{\"baslik\":\"orijinal baslik\",\"ozet\":\"1 cumlelik ozet\",\"aciklama\":\"kisa\",\"detayli_metin\":\"detay\"}. "
-        "Kaynak Başlık: " + haber['baslik'] + " | Kaynak Metin: " + haber['metin']
+        "Kaynak Başlık: "
+        + haber['baslik']
+        + " | Kaynak Metin: "
+        + haber['metin']
     )
 
     chat = client.chat.completions.create(
@@ -264,7 +285,7 @@ def ozgunlestir(haber):
 
 
 def resim_olustur(ai, gorsel):
-    print("SahaEkrani tam ekran sablon tasarimi olusturuluyor...")
+    print("SahaEkrani tasarimi olusturuluyor...")
 
     logo_base64 = ""
 
@@ -291,6 +312,10 @@ def resim_olustur(ai, gorsel):
 
 
 
+
+SAHA
+
+SON DAKİKA
 
 BASLIK
 OZET
