@@ -212,10 +212,10 @@ def haberleri_cek():
     return secilen
 
 def ozgunlestir(haber):
-    print("Groq yapay zeka devrede...")
+    print("Groq yapay zeka devrede (Kesin Doğruluk Modu)...")
 
     prompt = (
-        "Su haberi incele ve SADECE JSON formatinda ver. "
+        "Sen profesyonel ve güvenilir bir spor editörüsün. Aşağıdaki haberi incele ve KESİNLİKLE kafandan uydurma bilgi, transfer veya rakam eklemeden SADECE JSON formatinda ver. "
         "Baska hicbir kelime yazma: "
         "{\"baslik\":\"kisa\",\"ozet\":\"1 cumle\","
         "\"aciklama\":\"kisa\","
@@ -258,7 +258,7 @@ def ozgunlestir(haber):
     return json.loads(temiz_metin)
 
 def resim_olustur(ai, gorsel):
-    print("SahaEkrani tasarimi giydiriliyor (Net & Parlak Gorsel)...")
+    print("SahaEkrani tasarimi giydiriliyor (Net & Keskin Sığdırılmış Görsel)...")
 
     sablon = """[html]
     [head]
@@ -282,7 +282,7 @@ def resim_olustur(ai, gorsel):
             width: 1080px;
             height: 1080px;
             position: relative;
-            background: transparent;
+            background: #161b22;
             color: white;
             box-sizing: border-box;
             padding: 45px 60px 50px 60px;
@@ -294,11 +294,13 @@ def resim_olustur(ai, gorsel):
 
         .bg-image {
             position: absolute;
-            top: -10%;
-            left: -10%;
-            width: 120%;
-            height: 120%;
-            background: url('IMG_URL') center/cover no-repeat;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: url('IMG_URL') center/contain no-repeat;
+            background-color: #161b22;
+            image-rendering: -webkit-optimize-contrast;
             filter: none;
             z-index: -3;
         }
@@ -326,40 +328,17 @@ def resim_olustur(ai, gorsel):
             object-fit: contain;
         }
 
-        .header-text {
-            margin-left: 30px;
-        }
-
-        .header-text h1 {
-            font-family: 'Oswald', sans-serif;
-            font-size: 64px;
-            margin: 0;
-            line-height: 0.95;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-        }
-
-        .text-green {
-            color: #5ad54e;
-        }
-
-        .text-white {
-            color: #ffffff;
-        }
-
         .content-card {
             width: 100%;
             height: 500px;
-            background: rgba(22, 27, 34, 0.85);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
+            background: rgba(22, 27, 34, 0.88);
             border: 2px solid rgba(53, 152, 219, 0.3);
             border-radius: 30px;
             padding: 35px 45px;
             display: flex;
             flex-direction: column;
             justify-content: center;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.6);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.7);
             position: relative;
             overflow: hidden;
             box-sizing: border-box;
@@ -435,14 +414,6 @@ def resim_olustur(ai, gorsel):
                     [img src='LOGO.jpeg' alt='Saha Ekrani Logo']
                 [/div]
 
-                [div class='header-text']
-
-                    [h1 class='text-green']SAHA[/h1]
-
-                    [h1 class='text-white']EKRANI[/h1]
-
-                [/div]
-
             [/div]
 
             [div class='content-card']
@@ -506,10 +477,10 @@ def resim_olustur(ai, gorsel):
 
         page.goto(
             "file://" + os.path.abspath("gecici.html"),
-            wait_until="networkidle"
+            wait_until="load"
         )
 
-        page.wait_for_timeout(2500)
+        page.wait_for_timeout(3500)
 
         page.screenshot(
             path=yol,
