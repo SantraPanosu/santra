@@ -166,4 +166,4 @@ def resim_olustur(ai, gorsel):
 def aciklama_kaydet(ai):
     print("Aciklama dosyasi hazirlaniyor...")
     caption = "🚨 " + ai['baslik'] + "\n\n" + ai['detayli_metin'] + "\n\n#SahaEkrani #Futbol #Spor #Transfer"
-    yol = os.path.join(os.getcwd(),
+    yol = os.path.join(os.getcwd
