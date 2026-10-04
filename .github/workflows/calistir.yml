@@ -36,6 +36,12 @@ jobs:
         run: |
           python -m playwright install chromium
 
+      - name: Download IG session (if exists)
+        uses: actions/download-artifact@v4
+        with:
+          name: ig_session
+          path: /tmp
+
       - name: List repository files (debug)
         run: |
           echo "Working dir: $(pwd)"
@@ -45,9 +51,17 @@ jobs:
         env:
           IG_USERNAME: ${{ secrets.IG_USERNAME }}
           IG_PASSWORD: ${{ secrets.IG_PASSWORD }}
+          IG_2FA_SECRET: ${{ secrets.IG_2FA_SECRET }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
         run: |
           echo "Starting bot..."
           python ./haber_botu.py
+
+      - name: Upload IG session
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ig_session
+          path: /tmp/ig_session.json
