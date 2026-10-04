@@ -147,6 +147,8 @@ def resim_olustur(ai, gorsel):
             logo_base64 = base64.b64encode(f.read()).decode('utf-8')
     logo_src = f"data:image/jpeg;base64,{logo_base64}" if logo_base64 else ""
 
+    safe_gorsel = gorsel.replace("'", "%27").replace('"', "%22")
+
     html_icerik = f"""
     <html>
     <body>
