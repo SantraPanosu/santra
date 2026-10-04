@@ -166,4 +166,18 @@ def resim_olustur(ai, gorsel):
 def aciklama_kaydet(ai):
     print("Aciklama dosyasi hazirlaniyor...")
     caption = "🚨 " + ai['baslik'] + "\n\n" + ai['detayli_metin'] + "\n\n#SahaEkrani #Futbol #Spor #Transfer"
-    yol = os.path.join(os.getcwd
+    yol = os.path.join(os.getcwd(), "aciklama.txt")
+    with open(yol, "w", encoding="utf-8") as f:
+        f.write(caption)
+    return yol
+
+
+if __name__ == "__main__":
+    print("---- SAHA EKRANI BOT BASLIYOR ----")
+    h = haberleri_cek()
+    if h:
+        ai_veri = ozgunlestir(h)
+        resim = resim_olustur(ai_veri, h['gorsel'])
+        aciklama = aciklama_kaydet(ai_veri)
+        gecmiye_kaydet(h['baslik'], resim, aciklama)
+    print("---- ISLEM BITTI ----")
