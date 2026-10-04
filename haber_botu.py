@@ -119,21 +119,21 @@ def resim_olustur(ai, gorsel):
     [style]
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,700;0,900&family=Oswald:wght@500;700&display=swap');
         body, html { margin: 0; padding: 0; width: 1080px; height: 1080px; font-family: 'Montserrat', sans-serif; background-color: #161b22; display: flex; justify-content: center; align-items: center; overflow: hidden; }
-        .instagram-post { width: 1080px; height: 1080px; position: relative; background: linear-gradient(135deg, rgba(22,27,34,0.65) 0%, rgba(30,37,45,0.65) 100%); color: white; box-sizing: border-box; padding: 35px 60px 45px 60px; display: flex; flex-direction: column; z-index: 1; }
+        .instagram-post { width: 1080px; height: 1080px; position: relative; background: transparent; color: white; box-sizing: border-box; padding: 45px 60px 50px 60px; display: flex; flex-direction: column; justify-content: space-between; z-index: 1; }
         .bg-pattern { position: absolute; top: 0; left: 0; width: 1080px; height: 1080px; background-image: radial-gradient(circle at 50% 50%, rgba(53, 152, 219, 0.1) 0%, transparent 60%), linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px); background-size: 100% 100%, 50px 50px, 50px 50px; z-index: -2; }
-        .bg-image { position: absolute; top: -10%; left: -10%; width: 120%; height: 120%; background: url('IMG_URL') center/cover no-repeat; filter: blur(12px) brightness(0.38); z-index: -3; }
-        .header { display: flex; align-items: center; margin-bottom: 15px; z-index: 2; }
-        .logo-container { width: 140px; height: 140px; border-radius: 50%; overflow: hidden; border: 4px solid #3598db; box-shadow: 0 0 30px rgba(53, 152, 219, 0.4); background-color: #151a21; flex-shrink: 0; }
+        .bg-image { position: absolute; top: -10%; left: -10%; width: 120%; height: 120%; background: url('IMG_URL') center/cover no-repeat; filter: blur(14px) brightness(0.42); z-index: -3; }
+        .header { display: flex; align-items: center; z-index: 2; }
+        .logo-container { width: 150px; height: 150px; border-radius: 50%; overflow: hidden; border: 4px solid #3598db; box-shadow: 0 0 30px rgba(53, 152, 219, 0.4); background-color: #151a21; flex-shrink: 0; }
         .logo-container img { width: 100%; height: 100%; object-fit: contain; }
-        .header-text { margin-left: 25px; }
-        .header-text h1 { font-family: 'Oswald', sans-serif; font-size: 58px; margin: 0; line-height: 0.95; text-transform: uppercase; letter-spacing: 2px; }
+        .header-text { margin-left: 30px; }
+        .header-text h1 { font-family: 'Oswald', sans-serif; font-size: 64px; margin: 0; line-height: 0.95; text-transform: uppercase; letter-spacing: 2px; }
         .text-green { color: #5ad54e; }
         .text-white { color: #ffffff; }
-        .content-card { flex: 0.9; background: rgba(26, 32, 38, 0.70); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 2px solid rgba(53, 152, 219, 0.25); border-radius: 25px; padding: 35px 45px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 25px 50px rgba(0,0,0,0.6); position: relative; overflow: hidden; margin-top: 5px; }
+        .content-card { width: 100%; height: 580px; background: rgba(22, 27, 34, 0.82); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 2px solid rgba(53, 152, 219, 0.3); border-radius: 30px; padding: 45px 50px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 25px 50px rgba(0,0,0,0.6); position: relative; overflow: hidden; box-sizing: border-box; }
         .content-card::before { content: ''; position: absolute; left: 0; top: 0; width: 12px; height: 100%; background: linear-gradient(to bottom, #5ad54e, #3598db); }
-        .category-badge { display: inline-block; background-color: #5ad54e; color: #161b22; font-weight: 900; font-size: 22px; padding: 6px 20px; border-radius: 8px; margin-bottom: 15px; text-transform: uppercase; align-self: flex-start; box-shadow: 0 0 20px rgba(90, 213, 78, 0.3); }
-        .news-title { font-size: 42px; font-weight: 900; line-height: 1.2; margin: 0 0 15px 0; text-transform: uppercase; color: #ffffff; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
-        .news-body { font-size: 25px; line-height: 1.4; color: #e0e0e0; margin: 0; font-weight: 400; }
+        .category-badge { display: inline-block; background-color: #5ad54e; color: #161b22; font-weight: 900; font-size: 22px; padding: 6px 20px; border-radius: 8px; margin-bottom: 20px; text-transform: uppercase; align-self: flex-start; box-shadow: 0 0 20px rgba(90, 213, 78, 0.3); }
+        .news-title { font-size: 44px; font-weight: 900; line-height: 1.2; margin: 0 0 18px 0; text-transform: uppercase; color: #ffffff; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+        .news-body { font-size: 26px; line-height: 1.4; color: #e0e0e0; margin: 0; font-weight: 400; }
         .watermark { position: absolute; bottom: -30px; right: -30px; font-size: 200px; font-weight: 900; color: rgba(255,255,255,0.02); z-index: 0; pointer-events: none; font-family: 'Oswald', sans-serif; text-transform: uppercase; }
     [/style]
     [/head]
