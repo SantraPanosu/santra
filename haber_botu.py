@@ -112,11 +112,12 @@ def haberleri_cek():
     return secilen
 
 def ozgunlestir(haber):
-    print("Groq yapay zeka devrede...")
+    print("Groq yapay zeka devrede (Kesin Gerçeklik Modu)...")
     prompt = (
         "Sen profesyonel bir spor editörüsün. Aşağıdaki güncel haberi incele. "
-        "Kesinlikle uydurma bilgi ekleme. "
-        "SADECE JSON formatinda ver: "
+        "KESİNLİKLE KAFANDAN YENİ BİRŞEY, UYDURMA TRANSFER VEYA RAKAM EKLEME. "
+        "Sadece verilen kaynak metindeki gerçekleri baz alarak düzenle. "
+        "SADECE JSON formatinda ver, baska hicbir kelime yazma: "
         "{\"baslik\":\"orijinal baslik\",\"ozet\":\"1 cumlelik ozet\",\"aciklama\":\"kisa\",\"detayli_metin\":\"detay\"}. "
         "Kaynak Başlık: " + haber['baslik'] + " | Kaynak Metin: " + haber['metin']
     )
@@ -138,7 +139,7 @@ def ozgunlestir(haber):
     return json.loads(temiz_metin)
 
 def resim_olustur(ai, gorsel):
-    print("SahaEkrani tasarimi olusturuluyor...")
+    print("SahaEkrani tasarimi kusursuz sekilde olusturuluyor...")
     
     logo_base64 = ""
     if os.path.exists("LOGO.jpeg"):
@@ -162,7 +163,7 @@ def resim_olustur(ai, gorsel):
         browser = p.chromium.launch(args=["--no-sandbox"])
         page = browser.new_page(viewport={"width": 1080, "height": 1080})
         page.set_content(html_icerik, wait_until="load")
-        page.wait_for_timeout(2500)
+        page.wait_for_timeout(3000)
         page.screenshot(path=yol, type="jpeg", quality=90)
         browser.close()
 
