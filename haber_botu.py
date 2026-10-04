@@ -132,7 +132,6 @@ def ozgunlestir(haber):
 
 def resim_olustur(ai, gorsel):
     print("SahaEkrani tasarimi giydiriliyor...")
-    
     sablon = """
     <html>
     <body>
@@ -167,4 +166,4 @@ def resim_olustur(ai, gorsel):
 def aciklama_kaydet(ai):
     print("Aciklama dosyasi hazirlaniyor...")
     caption = "🚨 " + ai['baslik'] + "\n\n" + ai['detayli_metin'] + "\n\n#SahaEkrani #Futbol #Spor #Transfer"
-    yol = os.path
+    yol = os.path.join(os.getcwd(),
