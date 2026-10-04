@@ -9,10 +9,8 @@ import shutil
 import subprocess
 import html
 from pathlib import Path
-from datetime import datetime
 import feedparser
 import requests
-
 from groq import Groq
 from instagrapi import Client
 from instagrapi.exceptions import ClientError
@@ -45,7 +43,7 @@ RSS_KAYNAKLARI = [
 
 YEDEK = ["https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=1080"]
 HAFIZA = "paylasilanlar.json"
-DESIGN_TEMPLATE = "design.html"
+DESIGN_TEMPLATE = "tasarim.html"   # <-- burada tasarım dosya adı
 FILLED_HTML = "design_filled.html"
 OUTPUT_IMAGE = "santra_haber.jpg"
 LOCAL_BG = "bg_image.jpg"
@@ -154,7 +152,7 @@ def ozgunlestir(haber):
         logging.error("AI ozgunlestirme hatasi: %s", e)
         raise
 
-# --- Görsel indirme ve design entegrasyonu ---
+# --- Görsel indirme ve tasarım entegrasyonu ---
 def indir(url, hedef):
     try:
         r = requests.get(url, timeout=20, stream=True)
@@ -186,7 +184,6 @@ def fill_design(ai, bg_local_path):
         raise FileNotFoundError(f"{DESIGN_TEMPLATE} bulunamadi. Tasarimi repo'ya ekle.")
     with open(DESIGN_TEMPLATE, "r", encoding="utf-8") as f:
         tpl = f.read()
-    # Replace placeholders safely
     bg_url = "file://" + bg_local_path.replace("\\", "/")
     filled = tpl.replace("ARKA_PLAN_GORSELI_BURAYA", bg_url)
     filled = filled.replace("BASLIK_BURAYA", html_escape(ai.get("baslik",""), 220))
@@ -204,12 +201,12 @@ def resim_olustur_from_design(ai, gorsel_url):
         page = browser.new_page(viewport={"width": 1080, "height": 1080})
         page.goto("file://" + html_path)
         page.wait_for_load_state("networkidle")
-        page.wait_for_timeout(400)
+        page.wait_for_timeout(500)
         page.screenshot(path=OUTPUT_IMAGE, type="jpeg", quality=90)
         browser.close()
     return os.path.abspath(OUTPUT_IMAGE)
 
-# --- Hashtag üretimi (basit, keşfete düşme amaçlı) ---
+# --- Hashtag üretimi ---
 def generate_hashtags(title, extra_tags=None, max_tags=8):
     extra_tags = extra_tags or []
     words = re.findall(r'\w{4,}', title, flags=re.UNICODE)
@@ -223,7 +220,6 @@ def generate_hashtags(title, extra_tags=None, max_tags=8):
     tags = [f"#{w[0].capitalize()}" for w in sorted_words[:3]]
     fixed = ["#Futbol", "#Spor", "#Transfer"]
     tags = tags + fixed + extra_tags
-    # ensure unique and limit
     seen = []
     for t in tags:
         if t not in seen:
