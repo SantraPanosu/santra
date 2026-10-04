@@ -9,21 +9,23 @@ jobs:
   post:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 
-      - name: Ensure system libraries (for Playwright)
+      - name: Ensure system libraries (for Playwright and Pillow)
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
             libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxss1 \
-            libasound2t64 libgbm1 libgtk-3-0 libx11-xcb1 libxcomposite1 \
-            libxdamage1 libxrandr2 libxrender1 libxcb1 libxext6 \
-            libx264-dev libffi-dev ca-certificates fonts-liberation
+            libgbm1 libgtk-3-0 libx11-xcb1 libxcomposite1 libxdamage1 \
+            libxrandr2 libxrender1 libxcb1 libxext6 libx264-dev libffi-dev \
+            ca-certificates fonts-liberation libjpeg-dev zlib1g-dev \
+            libfreetype6-dev liblcms2-dev libwebp-dev
 
       - name: Install Python deps
         run: |
