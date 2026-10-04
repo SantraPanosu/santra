@@ -131,7 +131,7 @@ def ozgunlestir(haber):
     return json.loads(temiz_metin)
 
 def resim_olustur(ai, gorsel):
-    print("SahaEkrani tasarimi doğrudan oluşturuluyor...")
+    print("SahaEkrani tasarimi oluşturuluyor...")
     
     logo_base64 = ""
     if os.path.exists("LOGO.jpeg"):
@@ -139,16 +139,19 @@ def resim_olustur(ai, gorsel):
             logo_base64 = base64.b64encode(f.read()).decode('utf-8')
     logo_src = f"data:image/jpeg;base64,{logo_base64}" if logo_base64 else ""
 
-    html_content = f"""
+    html_content = """
     <html>
     <body>
-        <h1>SahaEkranı Şablon</h1>
+        <h1>SahaEkranı</h1>
         <h2>SON DAKİKA</h2>
-        <h3>{ai["baslik"]}</h3>
-        <p>{ai["ozet"]}</p>
+        <h3>BASLIK_PLACEHOLDER</h3>
+        <p>OZET_PLACEHOLDER</p>
     </body>
     </html>
     """
+
+    html_content = html_content.replace("BASLIK_PLACEHOLDER", ai["baslik"])
+    html_content = html_content.replace("OZET_PLACEHOLDER", ai["ozet"])
 
     yol = os.path.join(os.getcwd(), "santra_haber.jpg")
     with sync_playwright() as p:
@@ -164,5 +167,4 @@ def resim_olustur(ai, gorsel):
 
 def aciklama_kaydet(ai):
     print("Aciklama dosyasi hazirlaniyor...")
-    caption = "🚨 " + ai['baslik'] + "\n\n" + ai['detayli_metin'] + "\n\n#SahaEkrani #Futbol #Spor #Transfer"
-    yol = os.path.join(os.getcwd(),
+    caption = "🚨 " + ai['baslik'] + "\n\n" + ai['detayli_metin'] + "\n\n#SahaEkrani #Futbol #S
