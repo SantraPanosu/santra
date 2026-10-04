@@ -5,7 +5,8 @@ on:
     # Her 4 saatte bir otomatik çalışır (istediğin gibi değiştirebilirsin)
     - cron: '0 */4 * * *'
   workflow_dispatch: # Manuel olarak 'Run workflow' diyerek test edebilmeni sağlar
-
+permissions:
+  contents: write
 jobs:
   build:
     runs-on: ubuntu-latest
