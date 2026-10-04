@@ -1,6 +1,7 @@
 import os, random, re, json, subprocess, time, feedparser
 from groq import Groq
 from playwright.sync_api import sync_playwright
+from instagrapi import Client
 
 IG_USERNAME = os.environ.get("IG_USERNAME")
 IG_PASSWORD = os.environ.get("IG_PASSWORD")
@@ -118,12 +119,11 @@ def ozgunlestir(haber):
 def resim_olustur(ai, gorsel):
     print("Tasarim giydiriliyor...")
     
-    # SENIN TASARIMININ BİREBİR AYNISI (Özel kodlama ile)
     sablon = """[html]
     [head]
     [style]
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;900&display=swap');
-        body { margin: 0; width: 1080px; height: 1080px; font-family: 'Montserrat', sans-serif; position: relative; overflow: hidden; }
+        body { margin: 0; width: 1080px; height: 1080px; font-family: 'Montserrat', sans-serif; position: relative; overflow: hidden; background-color: #0b121d; }
         .bg-image { position: absolute; top: -5%; left: -5%; width: 110%; height: 110%; background: url('IMG_URL') center/cover no-repeat; filter: blur(15px) brightness(0.35); z-index: 1; }
         .container { position: relative; z-index: 2; height: 1080px; display: flex; flex-direction: column; justify-content: space-between; padding: 60px; box-sizing: border-box; }
         .logo-container { font-size: 55px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
@@ -150,7 +150,6 @@ def resim_olustur(ai, gorsel):
     [/body]
     [/html]"""
     
-    # Parantezleri güvenlice HTML'e çeviriyoruz
     html_icerik = sablon.replace("[", "<").replace("]", ">")
     html_icerik = html_icerik.replace("IMG_URL", gorsel)
     html_icerik = html_icerik.replace("BASLIK", ai["baslik"])
@@ -164,8 +163,10 @@ def resim_olustur(ai, gorsel):
     with sync_playwright() as p:
         browser = p.chromium.launch(args=["--no-sandbox"])
         page = browser.new_page(viewport={"width": 1080, "height": 1080})
-        page.goto("file://" + os.path.abspath("gecici.html"))
-        page.screenshot(path=yol, type="jpeg")
+        # Sayfanin ve resmin tamamen yuklenmesini bekliyoruz
+        page.goto("file://" + os.path.abspath("gecici.html"), wait_until="networkidle")
+        page.wait_for_timeout(2500) # Garanti olmasi icin ekstra 2.5 saniye bekleme
+        page.screenshot(path=yol, type="jpeg", quality=90)
         browser.close()
     
     print("Resim olusturuldu:", yol)
@@ -174,68 +175,17 @@ def resim_olustur(ai, gorsel):
 def instagram_yukle(resim, ai):
     caption = "🚨 " + ai['baslik'] + "\n\n" + ai['detayli_metin'] + "\n\n#Futbol #Spor #Transfer #Santra"
     
-    with sync_playwright() as p:
-        b = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage", "--disable-blink-features=AutomationControlled"])
+    try:
+        print("Instagrapi (Mobil API) ile baglaniliyor...")
+        cl = Client()
+        cl.login(IG_USERNAME, IG_PASSWORD)
+        print("Giris basarili! Fotograf paylasiliyor...")
         
-        context = b.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            viewport={"width": 1280, "height": 800}
-        )
-        page = context.new_page()
+        cl.photo_upload(resim, caption)
+        print(">>> Instagram yuklemesi KESIN OLARAK BASARILI! <<<")
         
-        try:
-            print("Instagram'a baglaniliyor...")
-            page.goto("https://www.instagram.com/accounts/login/", timeout=60000)
-            time.sleep(5)
-            
-            try:
-                page.locator("button:has-text('Allow all cookies'), button:has-text('Tüm çerezlere izin ver')").click(timeout=3000)
-                time.sleep(2)
-                print("Cerez penceresi kapatildi.")
-            except: pass
-                
-            print("Instagram giris formu bekleniyor...")
-            page.wait_for_selector("input[name='username']", timeout=15000)
-            page.locator("input[name='username']").fill(IG_USERNAME)
-            page.locator("input[name='password']").fill(IG_PASSWORD)
-            page.locator("button[type='submit']").click()
-            time.sleep(10)
-            
-            print("Giris yapildi, paylasim sayfasina geciliyor...")
-            page.goto("https://www.instagram.com/create/style/", timeout=60000)
-            time.sleep(5)
-            
-            page.locator("input[type='file']").set_input_files(resim)
-            time.sleep(3)
-            
-            for _ in range(2):
-                try:
-                    page.locator("button:has-text('İleri'), button:has-text('Next')").click(timeout=3000)
-                    time.sleep(2)
-                except: pass
-                    
-            page.locator("div[aria-label='Write a caption...'], textarea").fill(caption)
-            time.sleep(2)
-            page.locator("button:has-text('Paylaş'), button:has-text('Share')").click()
-            time.sleep(10)
-            print("Instagram yuklemesi basarili!")
-            
-        except Exception as e:
-            hata_yolu = os.path.join(os.getcwd(), "hata_ekrani.png")
-            page.screenshot(path=hata_yolu)
-            print("Instagram giris/paylasiminda takildi!")
-            print("Hata detayi:", str(e))
-            
-            try:
-                subprocess.run(["git", "add", hata_yolu], check=True)
-                subprocess.run(["git", "commit", "-m", "Hata ekrani eklendi [skip ci]"], check=True)
-                subprocess.run(["git", "push"], check=True)
-                print(">>> hata_ekrani.png GitHub depona yuklendi! Lutfen depodan o resme bak.")
-            except Exception as git_err:
-                print("Hata resmi GitHub'a yuklenemedi:", git_err)
-                
-        finally:
-            b.close()
+    except Exception as e:
+        print("Instagrapi paylasiminda hata olustu:", e)
 
 if __name__ == "__main__":
     print("---- SANTRA BOT BASLIYOR ----")
