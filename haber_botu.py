@@ -26,8 +26,9 @@ RSS_KAYNAKLARI = [
 HAFIZA_DOSYASI = "paylasilanlar.json"
 
 # Yasaklı kelimeler filtresi (Bahis, iddaa, maç saatleri, tv rehberi vb.)
+# "Canlı" ve "İzle" kelimeleri tek başlarına eklenerek filtreleme güçlendirildi.
 YASAKLI_KELIMELER = [
-    "misli", "iddaa", "bahis", "kupon", "oran", "casino", "slot", "yatırım", "bonus",
+    "canlı", "izle", "misli", "iddaa", "bahis", "kupon", "oran", "casino", "slot", "yatırım", "bonus",
     "hangi kanalda", "saat kaçta", "şifresiz", "canlı yayın", "canlı izle", 
     "yayınlanacak", "naklen", "ekranlarında", "yayın akışı", "maç programı"
 ]
@@ -127,7 +128,7 @@ def benzer_mi(yeni_baslik, gecmis_listesi):
     return False
 
 def haberleri_cek():
-    print("Haberler taraniyor, eski, resimsiz ve kopya olanlar eleniyor...")
+    print("Haberler taraniyor, eski, resimsiz, kopya ve TV rehberi olanlar eleniyor...")
 
     paylasilanlar = gecmisi_yukle()
     haberler = []
@@ -238,14 +239,16 @@ def haberleri_cek():
     return secilen
 
 def ozgunlestir(haber):
-    print("Groq yapay zeka devrede (Katı Gerçeklik Modu)...")
+    print("Groq yapay zeka devrede (Katı Gerçeklik Modu - Başlık Koruma)...")
 
+    # Prompt değiştirilerek yapay zekadan başlık özgünleştirmesi istenmiyor.
+    # Sadece özet ve detaylı metin istenir.
     prompt = (
         "Sen profesyonel ve kesinlikle yalan/uydurma haber yapmayan bir spor editörüsün. "
         "Aşağıdaki haberi incele. KESİNLİKLE kafandan eski teknik direktör, uydurma transfer, yalan bilgi veya rakam EKLEME. "
         "Haberde kimden ve hangi olaydan bahsediliyorsa sadece onu yaz, yorum katma. "
         "SADECE JSON formatinda ver, baska hicbir kelime yazma: "
-        "{\"baslik\":\"kisa\",\"ozet\":\"1 cumle\","
+        "{\"ozet\":\"1 cumle\","
         "\"aciklama\":\"kisa\","
         "\"detayli_metin\":\"uzun\"}. Haber: "
         + haber['baslik']
@@ -283,7 +286,11 @@ def ozgunlestir(haber):
     if match:
         temiz_metin = match.group(0)
 
-    return json.loads(temiz_metin)
+    # Orijinal başlığı geri ekle
+    temiz_json = json.loads(temiz_metin)
+    temiz_json['baslik'] = haber['baslik']
+
+    return temiz_json
 
 def resim_olustur(ai, gorsel):
     print("SahaEkrani tasarimi giydiriliyor (Tam Sığdırılmış, Parlak ve Net Görsel)...")
@@ -556,6 +563,7 @@ if __name__ == "__main__":
     h = haberleri_cek()
 
     if h:
+        # Yapay zeka özgünleştirmesi yapılırken başlık korunuyor.
         ai_veri = ozgunlestir(h)
 
         resim = resim_olustur(
