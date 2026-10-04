@@ -105,32 +105,43 @@ def resim_olustur(ai, gorsel):
 def instagram_yukle(resim, ai):
     caption = "🚨 " + ai['baslik'] + "\n\n" + ai['detayli_metin'] + "\n\n#Futbol #Spor #Transfer"
     with sync_playwright() as p:
-        b = p.chromium.launch(headless=True, args=["--no-sandbox"])
-        page = b.new_page()
-        page.goto("https://www.instagram.com/accounts/login/")
-        time.sleep(3)
-
+        b = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
+        
+        # Gerçek bir tarayıcı kimliği (User-Agent) tanımlıyoruz ki Instagram bot olduğunu anlamasın
+        context = b.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            viewport={"width": 1280, "height": 800}
+        )
+        page = context.new_page()
+        
+        print("Instagram'a bağlanılıyor...")
+        page.goto("https://www.instagram.com/accounts/login/", timeout=60000)
+        time.sleep(5) # Sayfanın tam oturması için bekleme
+        
+        # Kullanıcı adı alanını bekle ve doldur
+        page.wait_for_selector("input[name='username']", timeout=15000)
         page.locator("input[name='username']").fill(IG_USERNAME)
         page.locator("input[name='password']").fill(IG_PASSWORD)
         page.locator("button[type='submit']").click()
-        time.sleep(8)
-
-        page.goto("https://www.instagram.com/create/style/")
-        time.sleep(3)
+        time.sleep(10)
+        
+        page.goto("https://www.instagram.com/create/style/", timeout=60000)
+        time.sleep(5)
+        
         page.locator("input[type='file']").set_input_files(resim)
         time.sleep(3)
-
+        
         for _ in range(2):
             try:
                 page.locator("button:has-text('İleri'), button:has-text('Next')").click()
                 time.sleep(2)
             except Exception:
                 pass
-
+                
         page.locator("div[aria-label='Write a caption...'], textarea").fill(caption)
         time.sleep(2)
         page.locator("button:has-text('Paylaş'), button:has-text('Share')").click()
-        time.sleep(8)
+        time.sleep(10)
         b.close()
 
 
