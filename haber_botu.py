@@ -3,13 +3,13 @@ from groq import Groq
 from playwright.sync_api import sync_playwright
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+
 if not GROQ_API_KEY:
     print("HATA: GROQ_API_KEY eksik!")
     exit(1)
 
 client = Groq(api_key=GROQ_API_KEY)
 
-# Sadece saf spor ve futbol odaklı RSS kaynakları
 RSS_KAYNAKLARI = [
     "https://www.fanatik.com.tr/rss/anasayfa",
     "https://www.fotomac.com.tr/rss/anasayfa.xml",
@@ -31,8 +31,7 @@ YEDEK_GORSELLER = [
 
 HAFIZA_DOSYASI = "paylasilanlar.json"
 
-# Yasaklı kelimeler filtresi (Bahis, misli, iddaa vb.)
-YASAKLI_KELIMELER = ["misli", "iddaa", "bahis", "kupon", "oran", "casino", "slot", "yatırım", "bonus"]
+YASAKLI_KELIMELER = ["misli", "iddaa", "bahis", "kupon", "oran", "casino", "slot", "yatırım", "bonus", "günün maçları", "hangi kanalda", "saat kaçta"]
 
 def gecmisi_yukle():
     if os.path.exists(HAFIZA_DOSYASI):
@@ -55,7 +54,7 @@ def gecmiye_kaydet(baslik, resim_yolu, aciklama_yolu):
         subprocess.run(["git", "add", HAFIZA_DOSYASI], check=True)
         if os.path.exists(resim_yolu): subprocess.run(["git", "add", resim_yolu], check=True)
         if os.path.exists(aciklama_yolu): subprocess.run(["git", "add", aciklama_yolu], check=True)
-        subprocess.run(["git", "commit", "-m", "Yeni spor haberi hazirlandi (SahaEkrani) [skip ci]"], check=True)
+        subprocess.run(["git", "commit", "-m", "Yeni gercek spor haberi hazirlandi (SahaEkrani) [skip ci]"], check=True)
         subprocess.run(["git", "push"], check=True)
         print("Tum dosyalar GitHub'a kaydedildi!")
     except Exception as e:
@@ -73,7 +72,6 @@ def haberleri_cek():
                 baslik = entry.title
                 aciklama = entry.get('description', '')
                 
-                # Yasaklı kelime kontrolü (Bahis / Misli vb.)
                 metin_butun = (baslik + " " + aciklama).lower()
                 yasakli_varmi = any(kelime in metin_butun for kelime in YASAKLI_KELIMELER)
                 
@@ -97,12 +95,19 @@ def haberleri_cek():
         return None
         
     secilen = random.choice(haberler)
-    print("SECILEN TEMIZ HABER: " + secilen['baslik'])
+    print("SECILEN GERCEK HABER: " + secilen['baslik'])
     return secilen
 
 def ozgunlestir(haber):
     print("Groq yapay zeka devrede...")
-    prompt = "Su haberi incele ve SADECE JSON formatinda ver. Baska hicbir kelime yazma: {\"baslik\":\"kisa\",\"ozet\":\"1 cumle\",\"aciklama\":\"kisa\",\"detayli_metin\":\"uzun\"}. Haber: " + haber['baslik'] + " - " + haber['metin']
+    prompt = (
+        "Sen profesyonel bir spor editörüsün. Aşağıdaki haberi incele. "
+        "Eğer haber 'Günün maçları', 'Hangi kanalda?', 'Maç programı' veya takvim listesi gibi boş/tarihsel bir içerikse; "
+        "bunu reddet ve yerine gerçek bir olay (transfer, sakatlık, röportaj, kriz, kulüp açıklaması) formatına çevir. "
+        "SADECE JSON formatinda ver, baska hicbir kelime yazma: "
+        "{\"baslik\":\"kisa ve carpici baslik\",\"ozet\":\"1 cumlelik ozet\",\"aciklama\":\"kisa\",\"detayli_metin\":\"detayli aciklama\"}. "
+        "Haber: " + haber['baslik'] + " - " + haber['metin']
+    )
     
     chat = client.chat.completions.create(
         messages=[{"role": "user", "content": prompt}],
@@ -146,59 +151,4 @@ def resim_olustur(ai, gorsel):
     [body]
         [div class='instagram-post']
             [div class='bg-image'][/div]
-            [div class='watermark']SAHA[/div]
-            [div class='header']
-                [div class='logo-container']
-                    [img src='LOGO.jpeg' alt='Saha Ekrani Logo']
-                [/div]
-                [div class='header-text']
-                    [h1 class='text-green']SAHA[/h1]
-                    [h1 class='text-white']EKRANI[/h1]
-                [/div]
-            [/div]
-            [div class='content-card']
-                [div class='category-badge']SON DAKİKA[/div]
-                [div class='news-title']BASLIK[/div]
-                [div class='news-body']OZET[/div]
-            [/div]
-        [/div]
-    [/body]
-[/html]"""
-
-    html_icerik = sablon.replace("[", "<").replace("]", ">")
-    html_icerik = html_icerik.replace("IMG_URL", gorsel)
-    html_icerik = html_icerik.replace("BASLIK", ai["baslik"])
-    html_icerik = html_icerik.replace("OZET", ai["ozet"])
-
-    with open("gecici.html", "w", encoding="utf-8") as f:
-        f.write(html_icerik)
-
-    yol = os.path.join(os.getcwd(), "santra_haber.jpg")
-    with sync_playwright() as p:
-        browser = p.chromium.launch(args=["--no-sandbox"])
-        page = browser.new_page(viewport={"width": 1080, "height": 1080})
-        page.goto("file://" + os.path.abspath("gecici.html"), wait_until="networkidle")
-        page.wait_for_timeout(2500)
-        page.screenshot(path=yol, type="jpeg", quality=90)
-        browser.close()
-
-    print("SahaEkrani gorseli olusturuldu:", yol)
-    return yol
-
-def aciklama_kaydet(ai):
-    print("Aciklama dosyasi hazirlaniyor...")
-    caption = "🚨 " + ai['baslik'] + "\n\n" + ai['detayli_metin'] + "\n\n#SahaEkrani #Futbol #Spor #Transfer"
-    yol = os.path.join(os.getcwd(), "aciklama.txt")
-    with open(yol, "w", encoding="utf-8") as f:
-        f.write(caption)
-    return yol
-
-if __name__ == "__main__":
-    print("---- SAHA EKRANI BOT BASLIYOR ----")
-    h = haberleri_cek()
-    if h:
-        ai_veri = ozgunlestir(h)
-        resim = resim_olustur(ai_veri, h['gorsel'])
-        aciklama = aciklama_kaydet(ai_veri)
-        gecmiye_kaydet(h['baslik'], resim, aciklama)
-        print("---- ISLEM BITTI ----")
+            [div class='watermark']SAHA
