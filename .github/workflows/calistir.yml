@@ -2,7 +2,7 @@ name: Instagram Auto Post
 
 on:
   schedule:
-    - cron: '0 */3 * * *'   # her 3 saatte bir
+    - cron: '0 */3 * * *'
   workflow_dispatch: {}
 
 jobs:
@@ -41,8 +41,14 @@ jobs:
         run: |
           echo "Attempting to restore IG session from IG_SESSION_B64 secret (if set)..."
           if [ -n "${{ secrets.IG_SESSION_B64 }}" ]; then
-            echo "${{ secrets.IG_SESSION_B64 }}" | base64 --decode > /tmp/ig_session.json
-            echo "IG session restored to /tmp/ig_session.json"
+            # Try decode; don't fail the step on decode error
+            echo "${{ secrets.IG_SESSION_B64 }}" | base64 --decode > /tmp/ig_session.json 2>/tmp/ig_session.decode.err || true
+            if [ -s /tmp/ig_session.json ]; then
+              echo "IG session restored to /tmp/ig_session.json"
+            else
+              echo "IG_SESSION_B64 present but decode failed or produced empty file; skipping restore."
+              rm -f /tmp/ig_session.json /tmp/ig_session.decode.err || true
+            fi
           else
             echo "IG_SESSION_B64 secret not set; skipping restore."
           fi
