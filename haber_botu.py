@@ -22,16 +22,9 @@ RSS_KAYNAKLARI = [
     "https://www.yenisafak.com/rss/spor"
 ]
 
-YEDEK_GORSELLER = [
-    "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=1080",
-    "https://images.unsplash.com/photo-1518605368461-1e1e12db801b?q=80&w=1080",
-    "https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=1080",
-    "https://images.unsplash.com/photo-1556056504-5c7696c4c28d?q=80&w=1080"
-]
-
 HAFIZA_DOSYASI = "paylasilanlar.json"
 
-# Yasaklı kelimeler filtresi (Bahis, misli, iddaa, takvim programları vb.)
+# Yasaklı kelimeler filtresi (Bahis, misli, iddaa vb.)
 YASAKLI_KELIMELER = ["misli", "iddaa", "bahis", "kupon", "oran", "casino", "slot", "yatırım", "bonus", "günün maçları", "hangi kanalda", "saat kaçta", "maç programı", "haftanın maçları", "yayın akışı"]
 
 def gecmisi_yukle():
@@ -62,14 +55,14 @@ def gecmiye_kaydet(baslik, resim_yolu, aciklama_yolu):
         print("Git kayit uyarisi:", e)
 
 def haberleri_cek():
-    print("Haberler taraniyor ve filtreleniyor...")
+    print("Haberler ve gercek haber gorselleri taraniyor...")
     paylasilanlar = gecmisi_yukle()
     haberler = []
     
     for rss in RSS_KAYNAKLARI:
         try:
             feed = feedparser.parse(rss)
-            for entry in feed.entries[:5]:
+            for entry in feed.entries[:8]:
                 baslik = entry.title
                 aciklama = entry.get('description', '')
                 
@@ -78,37 +71,53 @@ def haberleri_cek():
                 yasakli_varmi = any(kelime in metin_butun for kelime in YASAKLI_KELIMELER)
                 
                 if not yasakli_varmi and baslik not in paylasilanlar:
-                    gorsel_url = random.choice(YEDEK_GORSELLER)
-                    if 'media_content' in entry:
-                        gorsel_url = entry.media_content[0]['url']
-                    elif 'enclosures' in entry and len(entry.enclosures) > 0:
-                        gorsel_url = entry.enclosures[0]['href']
+                    gorsel_url = None
                     
-                    if gorsel_url in YEDEK_GORSELLER:
-                        img_match = re.search(r'src=["\'](https?://[^"\']+\.(?:jpg|jpeg|png|webp))["\']', aciklama, re.IGNORECASE)
-                        if img_match: gorsel_url = img_match.group(1)
+                    # RSS kaynağından haberin KENDİ orijinal görselini almaya çalışıyoruz
+                    if hasattr(entry, 'media_content') and entry.media_content:
+                        gorsel_url = entry.media_content[0].get('url')
+                    elif hasattr(entry, 'media_thumbnail') and entry.media_thumbnail:
+                        gorsel_url = entry.media_thumbnail[0].get('url')
+                    elif hasattr(entry, 'enclosures') and entry.enclosures:
+                        for enc in entry.enclosures:
+                            if 'image' in enc.get('type', ''):
+                                gorsel_url = enc.get('href')
+                                break
+                        if not gorsel_url and entry.enclosures:
+                            gorsel_url = entry.enclosures[0].get('href')
                     
-                    haberler.append({'baslik': baslik, 'metin': aciklama, 'gorsel': gorsel_url})
+                    if not gorsel_url:
+                        html_text = aciklama
+                        if hasattr(entry, 'content'):
+                            for c in entry.content:
+                                html_text += " " + c.get('value', '')
+                        img_match = re.search(r'src=["\'](https?://[^"\']+\.(?:jpg|jpeg|png|webp|avif))["\']', html_text, re.IGNORECASE)
+                        if img_match:
+                            gorsel_url = img_match.group(1)
+                    
+                    # Sadece habere ait görseli bulunanları listeye ekle (Uydurma/rastgele resim olmasın)
+                    if gorsel_url:
+                        haberler.append({'baslik': baslik, 'metin': aciklama, 'gorsel': gorsel_url})
         except Exception:
             pass
             
     if not haberler:
-        print("UYARI: Paylasilacak uygun haber bulunamadi!")
+        print("UYARI: Habere ait gorsel bulunamadi!")
         return None
         
     secilen = random.choice(haberler)
-    print("SECILEN TEMIZ HABER: " + secilen['baslik'])
+    print("SECILEN GERCEK GORSELLI HABER: " + secilen['baslik'])
     return secilen
 
 def ozgunlestir(haber):
-    print("Groq yapay zeka devrede...")
+    print("Groq yapay zeka devrede (Kesin Gerçeklik Modu)...")
     prompt = (
-        "Sen profesyonel ve güvenilir bir spor editörüsün. Aşağıdaki haberi dikkatlice incele. "
-        "Eğer haber takvim, 'Günün maçları', 'Maç programı' veya maç listesi gibi gerçek bir olay içermeyen içerikse; "
-        "bunu reddet ve yerine gerçek bir olay (transfer, sakatlık, röportaj, kriz, kulüp açıklaması) formatına çevir. "
+        "Sen titiz ve güvenilir bir spor haber editörüsün. Aşağıdaki RSS haberini al ve KESİNLİKLE KAFANDAN YENİ BİR BİLGİ, TRANSFER VEYA RAKAM UYDURMADAN özetle. "
+        "Asla metinde geçmeyen hayali transferler, uydurma bonservis bedelleri veya yanlış bilgiler ekleme. "
+        "Sadece ve sadece verilen kaynak metindeki gerçekleri ve başlığı baz alarak sadeleştir. "
         "SADECE JSON formatinda ver, baska hicbir kelime yazma: "
-        "{\"baslik\":\"kisa\",\"ozet\":\"1 cumle\",\"aciklama\":\"kisa\",\"detayli_metin\":\"uzun\"}. "
-        "Haber: " + haber['baslik'] + " - " + haber['metin']
+        "{\"baslik\":\"orijinal veya gercekci baslik\",\"ozet\":\"metne sadik 1 cumlelik ozet\",\"aciklama\":\"kisa\",\"detayli_metin\":\"gercek metin detayi\"}. "
+        "Kaynak Başlık: " + haber['baslik'] + " | Kaynak Metin: " + haber['metin']
     )
     
     chat = client.chat.completions.create(
@@ -134,7 +143,7 @@ def resim_olustur(ai, gorsel):
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,700;0,900&family=Oswald:wght@500;700&display=swap');
         body, html { margin: 0; padding: 0; width: 1080px; height: 1080px; font-family: 'Montserrat', sans-serif; background-color: #161b22; display: flex; justify-content: center; align-items: center; overflow: hidden; }
         .instagram-post { width: 1080px; height: 1080px; position: relative; background: transparent; color: white; box-sizing: border-box; padding: 45px 60px 50px 60px; display: flex; flex-direction: column; justify-content: space-between; z-index: 1; }
-        .bg-image { position: absolute; top: -10%; left: -10%; width: 120%; height: 120%; background: url('IMG_URL') center/cover no-repeat; filter: blur(0.5px) brightness(0.6); z-index: -3; }
+        .bg-image { position: absolute; top: -10%; left: -10%; width: 120%; height: 120%; background: url('IMG_URL') center/cover no-repeat; filter: blur(0.1px) brightness(0.6); z-index: -3; }
         .header { display: flex; align-items: center; z-index: 2; }
         .logo-container { width: 150px; height: 150px; border-radius: 50%; overflow: hidden; border: 4px solid #3598db; box-shadow: 0 0 30px rgba(53, 152, 219, 0.4); background-color: #151a21; flex-shrink: 0; }
         .logo-container img { width: 100%; height: 100%; object-fit: contain; }
