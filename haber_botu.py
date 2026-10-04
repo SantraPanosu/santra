@@ -212,10 +212,10 @@ def haberleri_cek():
     return secilen
 
 def ozgunlestir(haber):
-    print("Groq yapay zeka devrede...")
+    print("Groq yapay zeka devrede (Kesin Doğruluk Modu)...")
 
     prompt = (
-        "Su haberi incele ve SADECE JSON formatinda ver. "
+        "Sen profesyonel ve güvenilir bir spor editörüsün. Aşağıdaki haberi incele ve KESİNLİKLE kafandan uydurma bilgi, transfer veya rakam eklemeden SADECE JSON formatinda ver. "
         "Baska hicbir kelime yazma: "
         "{\"baslik\":\"kisa\",\"ozet\":\"1 cumle\","
         "\"aciklama\":\"kisa\","
@@ -350,16 +350,14 @@ def resim_olustur(ai, gorsel):
         .content-card {
             width: 100%;
             height: 500px;
-            background: rgba(22, 27, 34, 0.85);
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
+            background: rgba(22, 27, 34, 0.88);
             border: 2px solid rgba(53, 152, 219, 0.3);
             border-radius: 30px;
             padding: 35px 45px;
             display: flex;
             flex-direction: column;
             justify-content: center;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.6);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.7);
             position: relative;
             overflow: hidden;
             box-sizing: border-box;
@@ -506,10 +504,10 @@ def resim_olustur(ai, gorsel):
 
         page.goto(
             "file://" + os.path.abspath("gecici.html"),
-            wait_until="networkidle"
+            wait_until="load"
         )
 
-        page.wait_for_timeout(2500)
+        page.wait_for_timeout(3500)
 
         page.screenshot(
             path=yol,
