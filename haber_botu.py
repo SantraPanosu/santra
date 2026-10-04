@@ -2,12 +2,10 @@ import os, random, re, json, subprocess, time, feedparser
 from groq import Groq
 from playwright.sync_api import sync_playwright
 
-IG_USERNAME = os.environ.get("IG_USERNAME")
-IG_PASSWORD = os.environ.get("IG_PASSWORD")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 
-if not GROQ_API_KEY or not IG_USERNAME or not IG_PASSWORD:
-    print("HATA: Gerekli ortam degiskenleri (Secrets) eksik!")
+if not GROQ_API_KEY:
+    print("HATA: GROQ_API_KEY eksik!")
     exit(1)
 
 client = Groq(api_key=GROQ_API_KEY)
@@ -42,8 +40,8 @@ def gecmisi_yukle():
             except: return []
     return []
 
-def gecmiye_kaydet(baslik, resim_yolu):
-    print("Hafiza guncelleniyor...")
+def gecmiye_kaydet(baslik, resim_yolu, aciklama_yolu):
+    print("Hafiza ve dosyalar guncelleniyor...")
     paylasilanlar = gecmisi_yukle()
     paylasilanlar.append(baslik)
     if len(paylasilanlar) > 150: paylasilanlar = paylasilanlar[-150:]
@@ -55,9 +53,10 @@ def gecmiye_kaydet(baslik, resim_yolu):
         subprocess.run(["git", "config", "--global", "user.email", "bot@santrapanosu.com"], check=True)
         subprocess.run(["git", "add", HAFIZA_DOSYASI], check=True)
         if os.path.exists(resim_yolu): subprocess.run(["git", "add", resim_yolu], check=True)
-        subprocess.run(["git", "commit", "-m", "Hafiza ve gorsel guncellendi [skip ci]"], check=True)
+        if os.path.exists(aciklama_yolu): subprocess.run(["git", "add", aciklama_yolu], check=True)
+        subprocess.run(["git", "commit", "-m", "Yeni haber hazirlandi (Gorsel + Aciklama) [skip ci]"], check=True)
         subprocess.run(["git", "push"], check=True)
-        print("Hafiza ve gorsel GitHub'a kaydedildi!")
+        print("Tum dosyalar GitHub'a kaydedildi!")
     except Exception as e:
         print("Git kayit uyarisi:", e)
 
@@ -107,7 +106,6 @@ def ozgunlestir(haber):
     )
     
     cevap = chat.choices[0].message.content
-    print("Groq cevap verdi.")
     temiz_metin = cevap.replace("```json", "").replace("```", "").strip()
     
     match = re.search(r'\{.*?\}', temiz_metin.replace('\n', ''), re.IGNORECASE | re.DOTALL)
@@ -117,7 +115,6 @@ def ozgunlestir(haber):
 
 def resim_olustur(ai, gorsel):
     print("Tasarim giydiriliyor...")
-    
     sablon = """[html]
     [head]
     [style]
@@ -170,79 +167,13 @@ def resim_olustur(ai, gorsel):
     print("Resim olusturuldu:", yol)
     return yol
 
-def instagram_yukle(resim, ai):
+def aciklama_kaydet(ai):
+    print("Aciklama dosyasi hazirlaniyor...")
     caption = "🚨 " + ai['baslik'] + "\n\n" + ai['detayli_metin'] + "\n\n#Futbol #Spor #Transfer #Santra"
-    
-    with sync_playwright() as p:
-        # Mobil görünüm (iPhone simülasyonu) ile bağlanıyoruz, bu sayede engelleri atlatıyoruz
-        b = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
-        context = b.new_context(
-            user_agent="Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
-            viewport={"width": 390, "height": 844},
-            is_mobile=True,
-            has_touch=True
-        )
-        page = context.new_page()
-        
-        try:
-            print("Instagram mobil web sürümüne bağlanılıyor...")
-            page.goto("https://www.instagram.com/accounts/login/", timeout=60000)
-            time.sleep(6)
-            
-            print("Giriş bilgileri dolduruluyor...")
-            page.wait_for_selector("input[name='username']", timeout=20000)
-            page.locator("input[name='username']").fill(IG_USERNAME)
-            page.locator("input[name='password']").fill(IG_PASSWORD)
-            page.locator("button[type='submit']").click()
-            time.sleep(10)
-            
-            print("Ana sayfaya geçiliyor...")
-            page.goto("https://www.instagram.com/", timeout=60000)
-            time.sleep(5)
-            
-            # Bildirim pencereleri çıkarsa kapat
-            try:
-                page.locator("button:has-text('Not Now'), button:has-text('Şimdi Değil')").click(timeout=3000)
-                time.sleep(2)
-            except: pass
-
-            print("Paylaşım alanı açılıyor...")
-            # Mobil web üzerinden resim yükleme butonunu tetikliyoruz
-            file_input = page.locator("input[type='file']")
-            if file_input.count() > 0:
-                file_input.set_input_files(resim)
-                time.sleep(4)
-                print("Görsel yüklendi, açıklama yazılıyor...")
-                
-                # İleri tuşlarına basarak devam et
-                for _ in range(3):
-                    try:
-                        page.locator("button:has-text('Next'), button:has-text('İleri'), div[role='button']:has-text('Next')").click(timeout=3000)
-                        time.sleep(3)
-                    except: pass
-                
-                # Açıklama metnini ekle
-                page.locator("textarea, div[contenteditable='true']").first.fill(caption)
-                time.sleep(3)
-                
-                # Paylaş butonuna bas
-                page.locator("button:has-text('Share'), button:has-text('Paylaş')").click(timeout=5000)
-                time.sleep(10)
-                print(">>> Instagram mobil yüklemesi BAŞARIYLA TAMAMLANDI! <<<")
-            else:
-                print("Mobil web yükleme alanı bulunamadı, alternatif yol deneniyor...")
-                
-        except Exception as e:
-            hata_yolu = os.path.join(os.getcwd(), "hata_ekrani.png")
-            page.screenshot(path=hata_yolu)
-            print("Instagram mobil yüklemesinde hata oluştu:", str(e))
-            try:
-                subprocess.run(["git", "add", hata_yolu], check=True)
-                subprocess.run(["git", "commit", "-m", "Hata ekrani guncellendi [skip ci]"], check=True)
-                subprocess.run(["git", "push"], check=True)
-            except: pass
-        finally:
-            b.close()
+    yol = os.path.join(os.getcwd(), "aciklama.txt")
+    with open(yol, "w", encoding="utf-8") as f:
+        f.write(caption)
+    return yol
 
 if __name__ == "__main__":
     print("---- SANTRA BOT BASLIYOR ----")
@@ -250,6 +181,6 @@ if __name__ == "__main__":
     if h:
         ai_veri = ozgunlestir(h)
         resim = resim_olustur(ai_veri, h['gorsel'])
-        gecmiye_kaydet(h['baslik'], resim)
-        instagram_yukle(resim, ai_veri)
+        aciklama = aciklama_kaydet(ai_veri)
+        gecmiye_kaydet(h['baslik'], resim, aciklama)
     print("---- ISLEM BITTI ----")
