@@ -69,7 +69,6 @@ def fetch_latest_entry(sources):
     Döndürülen dict: {'title':..., 'link':..., 'summary':..., 'published':...}
     """
     logging.info("RSS kaynaklarından haber çekiliyor...")
-    best = None
     for url in sources:
         try:
             d = feedparser.parse(url)
@@ -179,19 +178,58 @@ def make_screenshot_from_html(html_path: Path, output_image: Path):
 
 
 # ---------------------------
-# Instagram'a yükleme
+# Instagram'a yükleme (güncellenmiş, user_agent ve session desteği)
 # ---------------------------
 def post_to_instagram(image_path: Path, caption: str, username: str, password: str):
     """
     instagrapi kullanarak görseli yükler.
+    - Yeni user agent ile Instagram'ın "app out of date" hatasını azaltmaya çalışır.
+    - Eğer daha önce kaydedilmiş session varsa onu kullanır (CI için faydalı).
     """
-    logging.info("Instagram'a giriş yapılıyor: %s", username)
+    logging.info("Instagram'a giriş denemesi: %s", username)
+
     cl = Client()
+
+    # Daha güncel bir user agent belirle (Instagram uygulama sürümünü taklit eder)
     try:
-        cl.login(username, password)
+        cl.user_agent = "Instagram 300.0.0.0 Android (30/11; 420dpi; 1080x2340; OnePlus; OnePlus6T; OnePlus6T; qcom; tr_TR)"
+    except Exception:
+        pass
+
+    session_file = Path(tempfile.gettempdir()) / "ig_session.json"
+    try:
+        if session_file.exists():
+            logging.info("Kayıtlı session bulunuyor, yükleniyor: %s", session_file)
+            cl.load_settings(str(session_file))
+            try:
+                cl.login(username, password)
+            except Exception as e:
+                logging.warning("Session ile login başarısız, normal login deneniyor: %s", e)
+                cl = Client()
+                try:
+                    cl.user_agent = "Instagram 300.0.0.0 Android (30/11; 420dpi; 1080x2340; OnePlus; OnePlus6T; OnePlus6T; qcom; tr_TR)"
+                except Exception:
+                    pass
+                cl.login(username, password)
+        else:
+            cl.login(username, password)
     except Exception as e:
-        logging.error("Instagram login hatası: %s", e)
+        msg = str(e)
+        logging.error("Instagram login hatası: %s", msg)
+        if "out of date" in msg.lower() or "upgrade your app" in msg.lower():
+            logging.error(
+                "Hata: Instagram uygulama sürümü eski görünüyor. Çözüm önerileri: "
+                "1) instagrapi sürümünü güncelle (requirements.txt), "
+                "2) farklı/yenilenmiş user_agent kullan, "
+                "3) mümkünse Instagram Graph API veya önceden alınmış session kullan."
+            )
         raise
+
+    try:
+        cl.dump_settings(str(session_file))
+        logging.info("Session kaydedildi: %s", session_file)
+    except Exception:
+        logging.debug("Session kaydetme başarısız, devam ediliyor.")
 
     logging.info("Görsel yükleniyor: %s", image_path)
     try:
