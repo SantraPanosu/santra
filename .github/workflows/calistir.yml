@@ -41,6 +41,7 @@ jobs:
         with:
           name: ig_session
           path: /tmp
+        continue-on-error: true
 
       - name: List repository files (debug)
         run: |
