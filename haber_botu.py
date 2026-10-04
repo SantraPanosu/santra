@@ -1,4 +1,4 @@
-import os, random, re, json, subprocess, time, feedparser
+import os, random, re, json, subprocess, base64, feedparser
 from groq import Groq
 from playwright.sync_api import sync_playwright
 
@@ -138,28 +138,30 @@ def ozgunlestir(haber):
     return json.loads(temiz_metin)
 
 def resim_olustur(ai, gorsel):
-    print("SahaEkrani tasarimi giydiriliyor...")
-    sablon = """
+    print("SahaEkrani tasarimi olusturuluyor...")
+    
+    logo_base64 = ""
+    if os.path.exists("LOGO.jpeg"):
+        with open("LOGO.jpeg", "rb") as f:
+            logo_base64 = base64.b64encode(f.read()).decode('utf-8')
+    logo_src = f"data:image/jpeg;base64,{logo_base64}" if logo_base64 else ""
+
+    html_icerik = f"""
     <html>
     <body>
         <h1>SAHA</h1>
         <h2>SON DAKİKA</h2>
-        <h3>BASLIK</h3>
-        <p>OZET</p>
+        <h3>{ai["baslik"]}</h3>
+        <p>{ai["ozet"]}</p>
     </body>
     </html>
     """
-
-    html_icerik = sablon.replace("BASLIK", ai["baslik"]).replace("OZET", ai["ozet"])
-
-    with open("gecici.html", "w", encoding="utf-8") as f:
-        f.write(html_icerik)
 
     yol = os.path.join(os.getcwd(), "santra_haber.jpg")
     with sync_playwright() as p:
         browser = p.chromium.launch(args=["--no-sandbox"])
         page = browser.new_page(viewport={"width": 1080, "height": 1080})
-        page.goto("file://" + os.path.abspath("gecici.html"), wait_until="networkidle")
+        page.set_content(html_icerik, wait_until="load")
         page.wait_for_timeout(2500)
         page.screenshot(path=yol, type="jpeg", quality=90)
         browser.close()
