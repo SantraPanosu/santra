@@ -51,7 +51,6 @@ def gecmisi_yukle():
                 return json.load(f)
             except:
                 return []
-
     return []
 
 
@@ -184,10 +183,7 @@ def haberleri_cek():
                                 gorsel_url = enc.get("href")
                                 break
 
-                        if (
-                            not gorsel_url
-                            and entry.enclosures
-                        ):
+                        if not gorsel_url and entry.enclosures:
                             gorsel_url = entry.enclosures[0].get("href")
 
                     if not gorsel_url:
@@ -201,9 +197,7 @@ def haberleri_cek():
                                 )
 
                         img_match = re.search(
-                            r'src=["\']'
-                            r'(https?://[^"\']+\.(?:jpg|jpeg|png|webp|avif))'
-                            r'["\']',
+                            r'src=["\'](https?://[^"\']+\.(?:jpg|jpeg|png|webp|avif))["\']',
                             html_text,
                             re.IGNORECASE
                         )
@@ -249,8 +243,7 @@ def ozgunlestir(haber):
     )
 
     prompt = (
-        "Sen profesyonel bir spor editörüsün. "
-        "Aşağıdaki güncel haberi incele. "
+        "Sen profesyonel bir spor editörüsün. Aşağıdaki güncel haberi incele. "
         "KESİNLİKLE KAFANDAN YENİ BİRŞEY, UYDURMA TRANSFER VEYA RAKAM EKLEME. "
         "Sadece verilen kaynak metindeki gerçekleri baz alarak düzenle. "
         "SADECE JSON formatinda ver, baska hicbir kelime yazma: "
@@ -323,18 +316,215 @@ def resim_olustur(ai, gorsel):
     )
 
     sablon = """
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
 
+<style>
 
+* {
+    box-sizing: border-box;
+}
 
+html,
+body {
+    margin: 0;
+    padding: 0;
 
+    width: 1080px;
+    height: 1080px;
 
-SAHA
+    overflow: hidden;
 
-SON DAKİKA
+    font-family:
+        Arial,
+        Helvetica,
+        sans-serif;
 
-BASLIK
-OZET
+    background: #080808;
+}
 
+.container {
+    position: relative;
+
+    width: 1080px;
+    height: 1080px;
+
+    overflow: hidden;
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(0,0,0,0.05) 0%,
+            rgba(0,0,0,0.20) 35%,
+            rgba(0,0,0,0.92) 100%
+        ),
+        url("SAFE_GORSEL");
+
+    background-size: cover;
+    background-position: center;
+}
+
+.overlay {
+    position: absolute;
+
+    inset: 0;
+
+    background:
+        linear-gradient(
+            180deg,
+            rgba(0,0,0,0.05) 0%,
+            rgba(0,0,0,0.15) 35%,
+            rgba(0,0,0,0.95) 100%
+        );
+}
+
+.top-bar {
+    position: absolute;
+
+    top: 40px;
+    left: 45px;
+    right: 45px;
+
+    display: flex;
+
+    align-items: center;
+
+    justify-content: space-between;
+}
+
+.logo {
+    max-width: 180px;
+    max-height: 90px;
+
+    object-fit: contain;
+}
+
+.breaking {
+    background: #e30613;
+
+    color: white;
+
+    font-size: 25px;
+
+    font-weight: 900;
+
+    padding: 13px 24px;
+
+    border-radius: 5px;
+
+    letter-spacing: 1px;
+
+    text-transform: uppercase;
+}
+
+.content {
+    position: absolute;
+
+    left: 55px;
+    right: 55px;
+    bottom: 60px;
+
+    color: white;
+}
+
+.line {
+    width: 90px;
+    height: 7px;
+
+    background: #e30613;
+
+    margin-bottom: 22px;
+}
+
+.title {
+    font-size: 58px;
+
+    line-height: 1.02;
+
+    font-weight: 900;
+
+    text-transform: uppercase;
+
+    text-shadow:
+        0 3px 10px rgba(0,0,0,0.8);
+
+    margin-bottom: 22px;
+}
+
+.summary {
+    font-size: 29px;
+
+    line-height: 1.25;
+
+    font-weight: 600;
+
+    color: #f1f1f1;
+
+    max-width: 930px;
+
+    text-shadow:
+        0 2px 7px rgba(0,0,0,0.9);
+}
+
+.brand {
+    margin-top: 28px;
+
+    font-size: 22px;
+
+    font-weight: 800;
+
+    color: #ffffff;
+
+    letter-spacing: 2px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="container">
+
+    <div class="overlay"></div>
+
+    <div class="top-bar">
+
+        <img
+            class="logo"
+            src="LOGO_SRC"
+        >
+
+        <div class="breaking">
+            SON DAKİKA
+        </div>
+
+    </div>
+
+    <div class="content">
+
+        <div class="line"></div>
+
+        <div class="title">
+            BASLIK
+        </div>
+
+        <div class="summary">
+            OZET
+        </div>
+
+        <div class="brand">
+            SAHA EKRANI
+        </div>
+
+    </div>
+
+</div>
+
+</body>
+</html>
 """
 
     html_icerik = sablon.replace(
@@ -426,7 +616,7 @@ def aciklama_kaydet(ai):
     return yol
 
 
-if name == "main":
+if __name__ == "__main__":
     print(
         "---- SAHA EKRANI BOT BASLIYOR ----"
     )
