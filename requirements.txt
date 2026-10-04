@@ -1,3 +1,4 @@
 feedparser
 groq
 playwright
+instagrapi
