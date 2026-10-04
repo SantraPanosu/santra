@@ -1,7 +1,8 @@
-groq==1.7.0
+pyotp>=2.8
+Pillow>=8.1.1
+playwright==1.40.0
 instagrapi==1.19.1
 feedparser==6.0.10
 requests==2.31.0
 python-dotenv==1.0.0
-playwright==1.40.0
-Pillow>=8.1.1
+groq==1.7.0
