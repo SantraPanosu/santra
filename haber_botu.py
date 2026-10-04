@@ -1,4 +1,4 @@
-import os, random, re, json, subprocess, base64, feedparser
+import os, random, re, json, subprocess, time, feedparser
 from groq import Groq
 from playwright.sync_api import sync_playwright
 
@@ -89,7 +89,11 @@ def haberleri_cek():
                         gorsel_url = entry.enclosures[0].get('href')
                     
                     if not gorsel_url:
-                        img_match = re.search(r'src=["\'](https?://[^"\']+\.(?:jpg|jpeg|png|webp|avif))["\']', aciklama, re.IGNORECASE)
+                        html_text = aciklama
+                        if hasattr(entry, 'content'):
+                            for c in entry.content:
+                                html_text += " " + c.get('value', '')
+                        img_match = re.search(r'src=["\'](https?://[^"\']+\.(?:jpg|jpeg|png|webp|avif))["\']', html_text, re.IGNORECASE)
                         if img_match:
                             gorsel_url = img_match.group(1)
                     
@@ -104,7 +108,7 @@ def haberleri_cek():
         return None
         
     secilen = tum_adaylar[0]
-    print("SEÇİLEN HABER: " + secilen['baslik'])
+    print("SEÇİLEN EN YENİ VE BENZERSİZ HABER: " + secilen['baslik'])
     return secilen
 
 def ozgunlestir(haber):
@@ -135,24 +139,28 @@ def ozgunlestir(haber):
 
 def resim_olustur(ai, gorsel):
     print("SahaEkrani tasarimi giydiriliyor...")
-    html_icerik = f"""
+    sablon = """
     <html>
     <body>
         <h1>SAHA</h1>
-        <h2>SAHA EKRANI</h2>
-        <h3>SON DAKİKA</h3>
-        <h4>{ai["baslik"]}</h4>
-        <p>{ai["ozet"]}</p>
+        <h2>SON DAKİKA</h2>
+        <h3>BASLIK</h3>
+        <p>OZET</p>
     </body>
     </html>
     """
+
+    html_icerik = sablon.replace("BASLIK", ai["baslik"]).replace("OZET", ai["ozet"])
+
+    with open("gecici.html", "w", encoding="utf-8") as f:
+        f.write(html_icerik)
 
     yol = os.path.join(os.getcwd(), "santra_haber.jpg")
     with sync_playwright() as p:
         browser = p.chromium.launch(args=["--no-sandbox"])
         page = browser.new_page(viewport={"width": 1080, "height": 1080})
-        page.set_content(html_icerik, wait_until="load")
-        page.wait_for_timeout(1500)
+        page.goto("file://" + os.path.abspath("gecici.html"), wait_until="networkidle")
+        page.wait_for_timeout(2500)
         page.screenshot(path=yol, type="jpeg", quality=90)
         browser.close()
 
@@ -166,6 +174,7 @@ def aciklama_kaydet(ai):
     with open(yol, "w", encoding="utf-8") as f:
         f.write(caption)
     return yol
+
 
 if __name__ == "__main__":
     print("---- SAHA EKRANI BOT BASLIYOR ----")
