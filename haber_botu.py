@@ -3,7 +3,6 @@ from groq import Groq
 from playwright.sync_api import sync_playwright
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-
 if not GROQ_API_KEY:
     print("HATA: GROQ_API_KEY eksik!")
     exit(1)
@@ -41,7 +40,7 @@ def gecmisi_yukle():
     return []
 
 def gecmiye_kaydet(baslik, resim_yolu, aciklama_yolu):
-    print("Hafiza ve dosyalar guncelleniyor...")
+    print("Hafiza dan dosyalar guncelleniyor...")
     paylasilanlar = gecmisi_yukle()
     paylasilanlar.append(baslik)
     if len(paylasilanlar) > 150: paylasilanlar = paylasilanlar[-150:]
@@ -120,23 +119,21 @@ def resim_olustur(ai, gorsel):
     [style]
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,700;0,900&family=Oswald:wght@500;700&display=swap');
         body, html { margin: 0; padding: 0; width: 1080px; height: 1080px; font-family: 'Montserrat', sans-serif; background-color: #161b22; display: flex; justify-content: center; align-items: center; overflow: hidden; }
-        .instagram-post { width: 1080px; height: 1080px; position: relative; background: linear-gradient(135deg, #161b22 0%, #1e252d 100%); color: white; box-sizing: border-box; padding: 60px; display: flex; flex-direction: column; z-index: 1; }
+        .instagram-post { width: 1080px; height: 1080px; position: relative; background: linear-gradient(135deg, rgba(22,27,34,0.85) 0%, rgba(30,37,45,0.85) 100%); color: white; box-sizing: border-box; padding: 50px 60px 60px 60px; display: flex; flex-direction: column; z-index: 1; }
         .bg-pattern { position: absolute; top: 0; left: 0; width: 1080px; height: 1080px; background-image: radial-gradient(circle at 50% 50%, rgba(53, 152, 219, 0.1) 0%, transparent 60%), linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px); background-size: 100% 100%, 50px 50px, 50px 50px; z-index: -2; }
-        .bg-image { position: absolute; top: -5%; left: -5%; width: 110%; height: 110%; background-color: #1a2026; background-image: url('IMG_URL'); background-size: cover; background-position: center; filter: blur(20px) brightness(0.25); z-index: -3; }
-        .header { display: flex; align-items: center; margin-bottom: 40px; z-index: 2; }
-        .logo-container { width: 180px; height: 180px; border-radius: 50%; overflow: hidden; border: 4px solid #3598db; box-shadow: 0 0 30px rgba(53, 152, 219, 0.4); background-color: #151a21; flex-shrink: 0; }
+        .bg-image { position: absolute; top: -10%; left: -10%; width: 120%; height: 120%; background: url('IMG_URL') center/cover no-repeat; filter: blur(22px) brightness(0.28); z-index: -3; }
+        .header { display: flex; align-items: center; margin-bottom: 30px; z-index: 2; }
+        .logo-container { width: 170px; height: 170px; border-radius: 50%; overflow: hidden; border: 4px solid #3598db; box-shadow: 0 0 30px rgba(53, 152, 219, 0.4); background-color: #151a21; flex-shrink: 0; }
         .logo-container img { width: 100%; height: 100%; object-fit: contain; }
         .header-text { margin-left: 35px; }
-        .header-text h1 { font-family: 'Oswald', sans-serif; font-size: 75px; margin: 0; line-height: 0.95; text-transform: uppercase; letter-spacing: 2px; }
+        .header-text h1 { font-family: 'Oswald', sans-serif; font-size: 72px; margin: 0; line-height: 0.95; text-transform: uppercase; letter-spacing: 2px; }
         .text-green { color: #5ad54e; }
         .text-white { color: #ffffff; }
-        .content-card { flex: 1; background: rgba(26, 32, 38, 0.6); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); border: 2px solid rgba(53, 152, 219, 0.25); border-radius: 30px; padding: 50px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 25px 50px rgba(0,0,0,0.6); position: relative; overflow: hidden; }
+        .content-card { flex: 1; background: rgba(26, 32, 38, 0.75); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px); border: 2px solid rgba(53, 152, 219, 0.25); border-radius: 30px; padding: 50px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 25px 50px rgba(0,0,0,0.6); position: relative; overflow: hidden; margin-top: 10px; }
         .content-card::before { content: ''; position: absolute; left: 0; top: 0; width: 12px; height: 100%; background: linear-gradient(to bottom, #5ad54e, #3598db); }
         .category-badge { display: inline-block; background-color: #5ad54e; color: #161b22; font-weight: 900; font-size: 24px; padding: 8px 22px; border-radius: 8px; margin-bottom: 25px; text-transform: uppercase; align-self: flex-start; box-shadow: 0 0 20px rgba(90, 213, 78, 0.3); }
-        .news-title { font-size: 50px; font-weight: 900; line-height: 1.2; margin: 0 0 20px 0; text-transform: uppercase; color: #ffffff; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+        .news-title { font-size: 48px; font-weight: 900; line-height: 1.2; margin: 0 0 20px 0; text-transform: uppercase; color: #ffffff; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
         .news-body { font-size: 28px; line-height: 1.4; color: #e0e0e0; margin: 0; font-weight: 400; }
-        .footer { margin-top: 30px; display: flex; justify-content: flex-end; align-items: center; font-size: 24px; color: #7a8a99; font-weight: bold; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 20px; }
-        .footer-brand { color: #3598db; }
         .watermark { position: absolute; bottom: -30px; right: -30px; font-size: 200px; font-weight: 900; color: rgba(255,255,255,0.02); z-index: 0; pointer-events: none; font-family: 'Oswald', sans-serif; text-transform: uppercase; }
     [/style]
     [/head]
@@ -156,21 +153,18 @@ def resim_olustur(ai, gorsel):
             [/div]
             [div class='content-card']
                 [div class='category-badge']SON DAKİKA[/div]
-                [h1 class='news-title']BASLIK[/h1]
-                [p class='news-body']OZET[/p>
-            [/div]
-            [div class='footer']
-                [span class='footer-brand']@sahaekrani[/span]
+                [div class='news-title']BASLIK[/div]
+                [div class='news-body']OZET[/div]
             [/div]
         [/div]
     [/body]
-    [/html]"""
-    
+[/html]"""
+
     html_icerik = sablon.replace("[", "<").replace("]", ">")
     html_icerik = html_icerik.replace("IMG_URL", gorsel)
     html_icerik = html_icerik.replace("BASLIK", ai["baslik"])
     html_icerik = html_icerik.replace("OZET", ai["ozet"])
-    
+
     with open("gecici.html", "w", encoding="utf-8") as f:
         f.write(html_icerik)
 
@@ -182,7 +176,7 @@ def resim_olustur(ai, gorsel):
         page.wait_for_timeout(2500)
         page.screenshot(path=yol, type="jpeg", quality=90)
         browser.close()
-    
+
     print("SahaEkrani gorseli olusturuldu:", yol)
     return yol
 
@@ -202,4 +196,4 @@ if __name__ == "__main__":
         resim = resim_olustur(ai_veri, h['gorsel'])
         aciklama = aciklama_kaydet(ai_veri)
         gecmiye_kaydet(h['baslik'], resim, aciklama)
-    print("---- ISLEM BITTI ----")
+        print("---- ISLEM BITTI ----")
