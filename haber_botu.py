@@ -1,21 +1,14 @@
 #!/usr/bin/env python3
 # haber_botu.py
-# Basit, güvenli ve çalışır halde bir Instagram haber botu örneği.
-# - RSS kaynaklarını çeker
-# - İlk uygun haberi alır
-# - Basit bir HTML oluşturur
-# - Playwright ile HTML'den JPEG screenshot alır
-# - instagrapi ile görseli Instagram'a yükler
-#
-# Ortam değişkenleri:
-# IG_USERNAME, IG_PASSWORD, GROQ_API_KEY (opsiyonel, eğer kullanıyorsan)
-# GITHUB_REPOSITORY ve GITHUB_TOKEN CI için opsiyonel
+# Instagram haber botu — RSS çek, HTML oluştur, screenshot al, Instagram'a yükle
+# Retry + exponential backoff uygulanmıştır.
 
 import os
 import sys
 import tempfile
 import time
 import logging
+import random
 from datetime import datetime
 from pathlib import Path
 
@@ -24,7 +17,7 @@ from playwright.sync_api import sync_playwright
 from instagrapi import Client
 
 # ---------------------------
-# RSS kaynakları (istek üzerine eklendi)
+# RSS kaynakları
 # ---------------------------
 RSS_SOURCES = [
     "https://www.fanatik.com.tr/rss/anasayfa",
@@ -59,15 +52,10 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)]
 )
 
-
 # ---------------------------
 # RSS çekme
 # ---------------------------
 def fetch_latest_entry(sources):
-    """
-    Verilen RSS kaynaklarından en taze ve uygun ilk entry'yi döndürür.
-    Döndürülen dict: {'title':..., 'link':..., 'summary':..., 'published':...}
-    """
     logging.info("RSS kaynaklarından haber çekiliyor...")
     for url in sources:
         try:
@@ -76,7 +64,6 @@ def fetch_latest_entry(sources):
                 logging.debug("Kaynak boş veya parse edilemedi: %s", url)
                 continue
             for entry in d.entries:
-                # Basit filtre: başlık ve link olmalı
                 title = entry.get("title", "").strip()
                 link = entry.get("link", "").strip()
                 summary = entry.get("summary", entry.get("description", "")).strip()
@@ -89,7 +76,6 @@ def fetch_latest_entry(sources):
                     "summary": summary,
                     "published": published
                 }
-                # İlk uygun haberi al (basit davranış)
                 logging.info("Haber bulundu: %s (kaynak: %s)", title, url)
                 return candidate
         except Exception as e:
@@ -97,14 +83,10 @@ def fetch_latest_entry(sources):
     logging.info("Hiçbir uygun haber bulunamadı.")
     return None
 
-
 # ---------------------------
 # HTML oluşturma
 # ---------------------------
 def render_html_for_entry(entry, html_path: Path):
-    """
-    Basit bir HTML oluşturur. Daha gelişmiş tasarım istersen burayı değiştir.
-    """
     title = entry.get("title", "")
     summary = entry.get("summary", "")
     link = entry.get("link", "")
@@ -144,14 +126,10 @@ def render_html_for_entry(entry, html_path: Path):
     html_path.write_text(html, encoding="utf-8")
     logging.info("HTML dosyası oluşturuldu: %s", html_path)
 
-
 # ---------------------------
 # Playwright ile screenshot alma
 # ---------------------------
 def make_screenshot_from_html(html_path: Path, output_image: Path):
-    """
-    Playwright (Chromium) kullanarak verilen HTML dosyasının ekran görüntüsünü alır.
-    """
     logging.info("Playwright ile screenshot alınıyor...")
     with sync_playwright() as p:
         browser = p.chromium.launch(args=["--no-sandbox"])
@@ -159,98 +137,94 @@ def make_screenshot_from_html(html_path: Path, output_image: Path):
         page = context.new_page()
         page.goto("file://" + str(html_path.resolve()))
         page.wait_for_load_state("networkidle")
-
-        # Google Fonts veya diğer fontların yüklenmesini bekle (güvenlik için try/except)
         try:
             page.wait_for_function("document.fonts.ready.then(()=>true)", timeout=8000)
         except Exception:
             page.wait_for_timeout(500)
-
-        # Küçük ek bekleme, fontların render'ı için güvenlik
         page.wait_for_timeout(300)
-
-        # EKRAN GÖRÜNTÜSÜ AL (aynı girintide olmalı)
         page.screenshot(path=str(output_image), type="jpeg", quality=90)
-
         context.close()
         browser.close()
     logging.info("Screenshot alındı: %s", output_image)
 
-
 # ---------------------------
-# Instagram'a yükleme (güncellenmiş, user_agent ve session desteği)
+# Instagram'a yükleme (retry + exponential backoff)
 # ---------------------------
-def post_to_instagram(image_path: Path, caption: str, username: str, password: str):
+def post_to_instagram(image_path: Path, caption: str, username: str, password: str,
+                      max_retries: int = 6, base_delay: float = 5.0):
     """
-    instagrapi kullanarak görseli yükler.
-    - Yeni user agent ile Instagram'ın "app out of date" hatasını azaltmaya çalışır.
-    - Eğer daha önce kaydedilmiş session varsa onu kullanır (CI için faydalı).
+    Login ve upload için retry + exponential backoff uygular.
+    max_retries: toplam deneme sayısı
+    base_delay: başlangıç bekleme süresi (saniye)
     """
     logging.info("Instagram'a giriş denemesi: %s", username)
-
     cl = Client()
-
-    # Daha güncel bir user agent belirle (Instagram uygulama sürümünü taklit eder)
     try:
         cl.user_agent = "Instagram 300.0.0.0 Android (30/11; 420dpi; 1080x2340; OnePlus; OnePlus6T; OnePlus6T; qcom; tr_TR)"
     except Exception:
         pass
 
     session_file = Path(tempfile.gettempdir()) / "ig_session.json"
-    try:
-        if session_file.exists():
-            logging.info("Kayıtlı session bulunuyor, yükleniyor: %s", session_file)
-            cl.load_settings(str(session_file))
-            try:
-                cl.login(username, password)
-            except Exception as e:
-                logging.warning("Session ile login başarısız, normal login deneniyor: %s", e)
-                cl = Client()
-                try:
-                    cl.user_agent = "Instagram 300.0.0.0 Android (30/11; 420dpi; 1080x2340; OnePlus; OnePlus6T; OnePlus6T; qcom; tr_TR)"
-                except Exception:
-                    pass
-                cl.login(username, password)
-        else:
-            cl.login(username, password)
-    except Exception as e:
-        msg = str(e)
-        logging.error("Instagram login hatası: %s", msg)
-        if "out of date" in msg.lower() or "upgrade your app" in msg.lower():
-            logging.error(
-                "Hata: Instagram uygulama sürümü eski görünüyor. Çözüm önerileri: "
-                "1) instagrapi sürümünü güncelle (requirements.txt), "
-                "2) farklı/yenilenmiş user_agent kullan, "
-                "3) mümkünse Instagram Graph API veya önceden alınmış session kullan."
-            )
-        raise
 
+    # LOGIN RETRY
+    for attempt in range(1, max_retries + 1):
+        try:
+            if session_file.exists():
+                logging.info("Kayıtlı session yükleniyor: %s", session_file)
+                cl.load_settings(str(session_file))
+            cl.login(username, password)
+            logging.info("Instagram login başarılı.")
+            break
+        except Exception as e:
+            msg = str(e).lower()
+            logging.warning("Login denemesi %d başarısız: %s", attempt, msg)
+            # Rate limit veya 429 benzeri durumlarda daha uzun bekle
+            if "429" in msg or "too many" in msg or "rate" in msg or "out of date" in msg:
+                delay = base_delay * (2 ** (attempt - 1)) + random.uniform(0, 3)
+                logging.warning("Rate limit benzeri hata. %s saniye bekleniyor (attempt %d).", delay, attempt)
+                time.sleep(delay)
+            else:
+                time.sleep(min(base_delay * attempt, 60))
+            if attempt == max_retries:
+                logging.error("Login için maksimum deneme sayısına ulaşıldı.")
+                raise
+
+    # Başarılı login sonrası session kaydet
     try:
         cl.dump_settings(str(session_file))
         logging.info("Session kaydedildi: %s", session_file)
     except Exception:
         logging.debug("Session kaydetme başarısız, devam ediliyor.")
 
-    logging.info("Görsel yükleniyor: %s", image_path)
-    try:
-        media = cl.photo_upload(str(image_path), caption)
-        logging.info("Yükleme başarılı. Media id: %s", getattr(media, "pk", "unknown"))
-    except Exception as e:
-        logging.error("Instagram yükleme hatası: %s", e)
-        raise
-    finally:
+    # UPLOAD RETRY
+    for attempt in range(1, max_retries + 1):
         try:
-            cl.logout()
-        except Exception:
-            pass
+            media = cl.photo_upload(str(image_path), caption)
+            logging.info("Yükleme başarılı. Media id: %s", getattr(media, "pk", "unknown"))
+            break
+        except Exception as e:
+            msg = str(e).lower()
+            logging.warning("Upload denemesi %d başarısız: %s", attempt, msg)
+            if "429" in msg or "too many" in msg or "rate" in msg:
+                delay = base_delay * (2 ** (attempt - 1)) + random.uniform(0, 3)
+                logging.warning("Upload rate limit. %s saniye bekleniyor (attempt %d).", delay, attempt)
+                time.sleep(delay)
+            else:
+                time.sleep(min(base_delay * attempt, 30))
+            if attempt == max_retries:
+                logging.error("Upload için maksimum deneme sayısına ulaşıldı.")
+                raise
 
+    try:
+        cl.logout()
+    except Exception:
+        pass
 
 # ---------------------------
 # Ana akış
 # ---------------------------
 def main():
     logging.info("Bot başlatılıyor...")
-    # Ortam değişkenleri
     ig_user = os.environ.get("IG_USERNAME")
     ig_pass = os.environ.get("IG_PASSWORD")
 
@@ -263,22 +237,18 @@ def main():
         logging.info("Gönderilecek haber bulunamadı. Çıkılıyor.")
         return
 
-    # HTML oluştur
     render_html_for_entry(entry, HTML_FILE)
 
-    # Screenshot al
     try:
         make_screenshot_from_html(HTML_FILE, OUTPUT_IMAGE)
     except Exception as e:
         logging.error("Screenshot alınırken hata: %s", e)
         sys.exit(1)
 
-    # Caption hazırla (basit)
     title = entry.get("title", "")
     link = entry.get("link", "")
     caption = f"{title}\n\nKaynak: {link}"
 
-    # Instagram'a yükle
     try:
         post_to_instagram(OUTPUT_IMAGE, caption, ig_user, ig_pass)
     except Exception as e:
@@ -286,7 +256,6 @@ def main():
         sys.exit(1)
 
     logging.info("İşlem tamamlandı.")
-
 
 if __name__ == "__main__":
     main()
