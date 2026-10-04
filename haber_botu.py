@@ -80,11 +80,15 @@ def ozgunlestir(haber):
     return json.loads(temiz_metin)
 
 def resim_olustur(ai, gorsel):
-    html_icerik = "
-        " " + ai["baslik"] + " \n"
-        " " + ai["ozet"] + " \n"
-        " " + ai["aciklama"] + " \n"
+    html_icerik = """
+{}
+{}
+{}
+{}
+""".format(
+        gorsel, ai["baslik"], ai["ozet"], ai["aciklama"]
     )
+
     with open("gecici.html", "w", encoding="utf-8") as f:
         f.write(html_icerik)
 
