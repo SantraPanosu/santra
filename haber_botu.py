@@ -1,303 +1,254 @@
-# bot.py
+#!/usr/bin/env python3
+# haber_botu.py
+# Basit, güvenli ve çalışır halde bir Instagram haber botu örneği.
+# - RSS kaynaklarını çeker
+# - İlk uygun haberi alır
+# - Basit bir HTML oluşturur
+# - Playwright ile HTML'den JPEG screenshot alır
+# - instagrapi ile görseli Instagram'a yükler
+#
+# Ortam değişkenleri:
+# IG_USERNAME, IG_PASSWORD, GROQ_API_KEY (opsiyonel, eğer kullanıyorsan)
+# GITHUB_REPOSITORY ve GITHUB_TOKEN CI için opsiyonel
+
 import os
-import re
-import json
+import sys
+import tempfile
 import time
-import random
 import logging
-import shutil
-import subprocess
-import html
+from datetime import datetime
 from pathlib import Path
+
 import feedparser
-import requests
-from groq import Groq
-from instagrapi import Client
-from instagrapi.exceptions import ClientError
-from requests.exceptions import RequestException
 from playwright.sync_api import sync_playwright
+from instagrapi import Client
 
-# --- Logging ---
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-
-# --- Env / Secrets ---
-IG_USERNAME = os.environ.get("IG_USERNAME")
-IG_PASSWORD = os.environ.get("IG_PASSWORD")
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN")
-GITHUB_REPOSITORY = os.environ.get("GITHUB_REPOSITORY")
-
-if not IG_USERNAME or not IG_PASSWORD or not GROQ_API_KEY:
-    logging.error("HATA: IG_USERNAME, IG_PASSWORD veya GROQ_API_KEY eksik.")
-    raise SystemExit("Secrets eksik. GitHub Secrets ayarlarını kontrol et.")
-
-client = Groq(api_key=GROQ_API_KEY)
-
-# --- Konfig ---
-RSS_KAYNAKLARI = [
+# ---------------------------
+# RSS kaynakları (istek üzerine eklendi)
+# ---------------------------
+RSS_SOURCES = [
     "https://www.fanatik.com.tr/rss/anasayfa",
     "https://www.fotomac.com.tr/rss/anasayfa.xml",
     "https://www.sporx.com/rss.php",
-    "https://www.ntv.com.tr/spor.rss"
+    "https://feeds.bbci.co.uk/turkce/rss.xml",
+    "https://beinsports.com.tr/rss/haberler",
+    "https://www.transfermarkt.com.tr/rss/news",
+    "https://www.trthaber.com/spor_articles.rss",
+    "https://www.ntv.com.tr/spor.rss",
+    "https://www.cnnturk.com/feed/rss/spor/news",
+    "https://www.hurriyet.com.tr/rss/spor",
+    "https://www.cumhuriyet.com.tr/rss/kategori/spor-7",
+    "https://www.milliyet.com.tr/rss/rssnew/sporvadisi/tumu.xml",
+    "https://www.sabah.com.tr/rss/spor.xml",
+    "https://www.aksam.com.tr/rss/spor.rss",
+    "https://www.yenisafak.com/rss/spor"
 ]
 
-YEDEK = ["https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=1080"]
-HAFIZA = "paylasilanlar.json"
-DESIGN_TEMPLATE = "tasarim.html"   # <-- burada tasarım dosya adı
-FILLED_HTML = "design_filled.html"
-OUTPUT_IMAGE = "santra_haber.jpg"
-LOCAL_BG = "bg_image.jpg"
-SESSION_FILE = "ig_session.json"
-MAX_HISTORY = 150
+# ---------------------------
+# Ayarlar
+# ---------------------------
+OUTPUT_DIR = Path(tempfile.gettempdir()) / "haber_botu"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+OUTPUT_IMAGE = OUTPUT_DIR / "haber.jpg"
+HTML_FILE = OUTPUT_DIR / "haber.html"
+LOG_LEVEL = logging.INFO
 
-# --- Yardımcı fonksiyonlar ---
-def safe_load_json(path):
-    if not os.path.exists(path):
-        return []
-    try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except Exception:
-        return []
+logging.basicConfig(
+    level=LOG_LEVEL,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[logging.StreamHandler(sys.stdout)]
+)
 
-def gecmisi_yukle():
-    return safe_load_json(HAFIZA)
 
-def gecmiye_kaydet(baslik, resim_yolu):
-    paylasilanlar = gecmisi_yukle()
-    paylasilanlar.append(baslik)
-    try:
-        with open(HAFIZA, "w", encoding="utf-8") as f:
-            json.dump(paylasilanlar[-MAX_HISTORY:], f, ensure_ascii=False, indent=2)
-    except Exception as e:
-        logging.warning("Hafiza yazma hatasi: %s", e)
-
-    # Git push (sadece Actions ortamında)
-    if not GITHUB_TOKEN or not GITHUB_REPOSITORY:
-        return
-    try:
-        subprocess.run(["git", "config", "--global", "user.name", "Bot"], check=True)
-        subprocess.run(["git", "config", "--global", "user.email", "bot@santra.com"], check=True)
-        subprocess.run(["git", "add", HAFIZA], check=True)
-        if os.path.exists(resim_yolu):
-            subprocess.run(["git", "add", resim_yolu], check=True)
-        subprocess.run(["git", "commit", "-m", "Guncelleme [skip ci]"], check=True)
-        remote = f"https://x-access-token:{GITHUB_TOKEN}@github.com/{GITHUB_REPOSITORY}.git"
-        subprocess.run(["git", "push", remote, "HEAD:main"], check=True)
-        logging.info("Hafiza pushlandi.")
-    except subprocess.CalledProcessError as e:
-        logging.warning("Git push hatasi: %s", e)
-
-def haberleri_cek():
-    paylasilanlar = set(gecmisi_yukle())
-    haberler = []
-    for rss in RSS_KAYNAKLARI:
+# ---------------------------
+# RSS çekme
+# ---------------------------
+def fetch_latest_entry(sources):
+    """
+    Verilen RSS kaynaklarından en taze ve uygun ilk entry'yi döndürür.
+    Döndürülen dict: {'title':..., 'link':..., 'summary':..., 'published':...}
+    """
+    logging.info("RSS kaynaklarından haber çekiliyor...")
+    best = None
+    for url in sources:
         try:
-            feed = feedparser.parse(rss)
-            for entry in feed.entries[:6]:
-                title = getattr(entry, "title", None)
-                if not title or title in paylasilanlar:
+            d = feedparser.parse(url)
+            if not d or not d.entries:
+                logging.debug("Kaynak boş veya parse edilemedi: %s", url)
+                continue
+            for entry in d.entries:
+                # Basit filtre: başlık ve link olmalı
+                title = entry.get("title", "").strip()
+                link = entry.get("link", "").strip()
+                summary = entry.get("summary", entry.get("description", "")).strip()
+                published = entry.get("published", entry.get("updated", ""))
+                if not title or not link:
                     continue
-                gorsel = random.choice(YEDEK)
-                if hasattr(entry, "media_content"):
-                    try:
-                        gorsel = entry.media_content[0].get('url', gorsel)
-                    except Exception:
-                        pass
-                elif hasattr(entry, "links"):
-                    for l in entry.links:
-                        if l.get('type','').startswith('image'):
-                            gorsel = l.get('href', gorsel)
-                            break
-                haberler.append({'baslik': title, 'metin': entry.get('description',''), 'gorsel': gorsel})
+                candidate = {
+                    "title": title,
+                    "link": link,
+                    "summary": summary,
+                    "published": published
+                }
+                # İlk uygun haberi al (basit davranış)
+                logging.info("Haber bulundu: %s (kaynak: %s)", title, url)
+                return candidate
         except Exception as e:
-            logging.debug("RSS parse hatasi %s: %s", rss, e)
-            continue
-    if not haberler:
-        return None
-    return random.choice(haberler)
+            logging.warning("RSS parse hatası %s: %s", url, e)
+    logging.info("Hiçbir uygun haber bulunamadı.")
+    return None
 
-# --- AI parse güvenli ---
-def parse_ai_json(cevap):
-    s = cevap.replace("```json", "").replace("```", "").strip()
-    match = re.search(r'\{.*\}', s, re.DOTALL)
-    if not match:
-        raise ValueError("AI'den JSON bulunamadi")
-    candidate = match.group(0)
-    try:
-        return json.loads(candidate)
-    except json.JSONDecodeError:
-        fixed = candidate.replace("'", '"')
-        fixed = re.sub(r',\s*}', '}', fixed)
-        fixed = re.sub(r',\s*]', ']', fixed)
-        return json.loads(fixed)
 
-def ozgunlestir(haber):
-    logging.info("Yapay zeka ile orjinal metin olusturuluyor...")
-    prompt = (
-        'Su spor haberini incele ve SADECE JSON formatinda ver. '
-        'Baska hicbir kelime yazma: {"baslik":"kisa baslik","ozet":"1 cumle","aciklama":"kisa","detayli_metin":"uzun text"}. '
-        'Haber: ' + (haber['baslik'] or '') + ' - ' + (haber.get('metin','') or '')
-    )
-    try:
-        chat = client.chat.completions.create(
-            messages=[{"role": "user", "content": prompt}],
-            model="openai/gpt-oss-120b",
-            max_completion_tokens=2048,
-            reasoning_effort="medium"
-        )
-        cevap = chat.choices[0].message.content
-        return parse_ai_json(cevap)
-    except Exception as e:
-        logging.error("AI ozgunlestirme hatasi: %s", e)
-        raise
+# ---------------------------
+# HTML oluşturma
+# ---------------------------
+def render_html_for_entry(entry, html_path: Path):
+    """
+    Basit bir HTML oluşturur. Daha gelişmiş tasarım istersen burayı değiştir.
+    """
+    title = entry.get("title", "")
+    summary = entry.get("summary", "")
+    link = entry.get("link", "")
+    published = entry.get("published", "")
+    now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
 
-# --- Görsel indirme ve tasarım entegrasyonu ---
-def indir(url, hedef):
-    try:
-        r = requests.get(url, timeout=20, stream=True)
-        r.raise_for_status()
-        with open(hedef, "wb") as f:
-            shutil.copyfileobj(r.raw, f)
-        return True
-    except Exception as e:
-        logging.warning("Indirme hatasi %s -> %s : %s", url, hedef, e)
-        return False
+    html = f"""<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>{title}</title>
+  <style>
+    body {{ font-family: Arial, Helvetica, sans-serif; margin:0; padding:0; background:#fff; color:#111; }}
+    .card {{ width:1200px; height:630px; padding:40px; box-sizing:border-box; display:flex; flex-direction:column; justify-content:space-between; }}
+    .title {{ font-size:48px; font-weight:700; line-height:1.05; margin-bottom:20px; }}
+    .summary {{ font-size:22px; color:#333; max-height:300px; overflow:hidden; }}
+    .meta {{ font-size:14px; color:#666; margin-top:20px; }}
+    .footer {{ font-size:12px; color:#999; }}
+    a {{ color:#1a73e8; text-decoration:none; }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div>
+      <div class="title">{title}</div>
+      <div class="summary">{summary}</div>
+    </div>
+    <div>
+      <div class="meta">Kaynak: <a href="{link}">{link}</a></div>
+      <div class="footer">Oluşturuldu: {now} • Yayın tarihi: {published}</div>
+    </div>
+  </div>
+</body>
+</html>
+"""
+    html_path.write_text(html, encoding="utf-8")
+    logging.info("HTML dosyası oluşturuldu: %s", html_path)
 
-def prepare_background(gorsel_url):
-    if not gorsel_url:
-        gorsel_url = YEDEK[0]
-    ok = indir(gorsel_url, LOCAL_BG)
-    if not ok:
-        indir(YEDEK[0], LOCAL_BG)
-    return os.path.abspath(LOCAL_BG)
 
-def html_escape(s, limit=None):
-    if s is None:
-        return ""
-    if limit:
-        s = s[:limit]
-    return html.escape(s)
-
-def fill_design(ai, bg_local_path):
-    if not os.path.exists(DESIGN_TEMPLATE):
-        raise FileNotFoundError(f"{DESIGN_TEMPLATE} bulunamadi. Tasarimi repo'ya ekle.")
-    with open(DESIGN_TEMPLATE, "r", encoding="utf-8") as f:
-        tpl = f.read()
-    bg_url = "file://" + bg_local_path.replace("\\", "/")
-    filled = tpl.replace("ARKA_PLAN_GORSELI_BURAYA", bg_url)
-    filled = filled.replace("BASLIK_BURAYA", html_escape(ai.get("baslik",""), 220))
-    filled = filled.replace("OZET_BURAYA", html_escape(ai.get("ozet",""), 200))
-    filled = filled.replace("ACIKLAMA_BURAYA", html_escape(ai.get("aciklama",""), 800))
-    with open(FILLED_HTML, "w", encoding="utf-8") as f:
-        f.write(filled)
-    return os.path.abspath(FILLED_HTML)
-
-def resim_olustur_from_design(ai, gorsel_url):
-    bg_path = prepare_background(gorsel_url)
-    html_path = fill_design(ai, bg_path)
+# ---------------------------
+# Playwright ile screenshot alma
+# ---------------------------
+def make_screenshot_from_html(html_path: Path, output_image: Path):
+    """
+    Playwright (Chromium) kullanarak verilen HTML dosyasının ekran görüntüsünü alır.
+    """
+    logging.info("Playwright ile screenshot alınıyor...")
     with sync_playwright() as p:
-        browser = p.chromium.launch(args=["--no-sandbox"], headless=True)
-        page = browser.new_page(viewport={"width": 1080, "height": 1080})
-        page.goto("file://" + html_path)
-page.wait_for_load_state("networkidle")
+        browser = p.chromium.launch(args=["--no-sandbox"])
+        context = browser.new_context(viewport={"width": 1200, "height": 630})
+        page = context.new_page()
+        page.goto("file://" + str(html_path.resolve()))
+        page.wait_for_load_state("networkidle")
 
-# Google Fonts'un yüklenmesini bekle (document.fonts.ready)
-try:
-    page.wait_for_function("document.fonts.ready.then(()=>true)", timeout=8000)
-except Exception:
-    # Eğer fonts.ready Promise'i beklenemez veya timeout olursa kısa bir ek bekleme yap
-    page.wait_for_timeout(500)
+        # Google Fonts veya diğer fontların yüklenmesini bekle (güvenlik için try/except)
+        try:
+            page.wait_for_function("document.fonts.ready.then(()=>true)", timeout=8000)
+        except Exception:
+            page.wait_for_timeout(500)
 
-# Küçük ek bekleme, fontların render'ı için güvenlik
-page.wait_for_timeout(300)
+        # Küçük ek bekleme, fontların render'ı için güvenlik
+        page.wait_for_timeout(300)
 
-page.screenshot(path=OUTPUT_IMAGE, type="jpeg", quality=90)
-     page.screenshot(path=OUTPUT_IMAGE, type="jpeg", quality=90)
+        # EKRAN GÖRÜNTÜSÜ AL (aynı girintide olmalı)
+        page.screenshot(path=str(output_image), type="jpeg", quality=90)
+
+        context.close()
         browser.close()
-    return os.path.abspath(OUTPUT_IMAGE)
+    logging.info("Screenshot alındı: %s", output_image)
 
-# --- Hashtag üretimi ---
-def generate_hashtags(title, extra_tags=None, max_tags=8):
-    extra_tags = extra_tags or []
-    words = re.findall(r'\w{4,}', title, flags=re.UNICODE)
-    freq = {}
-    for w in words:
-        w_clean = re.sub(r'[^A-Za-z0-9ÇĞİÖŞÜçğıöşü]', '', w).lower()
-        if len(w_clean) < 3:
-            continue
-        freq[w_clean] = freq.get(w_clean, 0) + 1
-    sorted_words = sorted(freq.items(), key=lambda x: (-x[1], x[0]))
-    tags = [f"#{w[0].capitalize()}" for w in sorted_words[:3]]
-    fixed = ["#Futbol", "#Spor", "#Transfer"]
-    tags = tags + fixed + extra_tags
-    seen = []
-    for t in tags:
-        if t not in seen:
-            seen.append(t)
-        if len(seen) >= max_tags:
-            break
-    return " ".join(seen)
 
-# --- Instagram yükleme (instagrapi) ---
-def instagram_yukle_instagrapi(resim, ai, max_retries=3):
-    caption_body = ai.get('detayli_metin','') or ai.get('aciklama','') or ai.get('ozet','')
-    caption = "🚨 " + ai.get('baslik','') + "\n\n" + caption_body + "\n\n" + generate_hashtags(ai.get('baslik',''))
+# ---------------------------
+# Instagram'a yükleme
+# ---------------------------
+def post_to_instagram(image_path: Path, caption: str, username: str, password: str):
+    """
+    instagrapi kullanarak görseli yükler.
+    """
+    logging.info("Instagram'a giriş yapılıyor: %s", username)
     cl = Client()
     try:
-        if os.path.exists(SESSION_FILE):
-            cl.load_settings(SESSION_FILE)
-            cl.login(IG_USERNAME, IG_PASSWORD)
-        else:
-            cl.login(IG_USERNAME, IG_PASSWORD)
-            cl.dump_settings(SESSION_FILE)
+        cl.login(username, password)
     except Exception as e:
-        logging.warning("IG login sorunu: %s", e)
+        logging.error("Instagram login hatası: %s", e)
+        raise
 
-    attempt = 0
-    while attempt < max_retries:
+    logging.info("Görsel yükleniyor: %s", image_path)
+    try:
+        media = cl.photo_upload(str(image_path), caption)
+        logging.info("Yükleme başarılı. Media id: %s", getattr(media, "pk", "unknown"))
+    except Exception as e:
+        logging.error("Instagram yükleme hatası: %s", e)
+        raise
+    finally:
         try:
-            media = cl.photo_upload(resim, caption)
-            logging.info("Paylasildi: %s", getattr(media, "pk", "unknown"))
-            return True
-        except (ClientError, RequestException) as e:
-            attempt += 1
-            wait = 2 ** attempt
-            logging.warning("Instagram yukleme hatasi (deneme %d): %s. %d sn bekleniyor.", attempt, e, wait)
-            time.sleep(wait)
-        except Exception as e:
-            logging.error("Beklenmeyen hata Instagram yukleme: %s", e)
-            return False
-    logging.error("Instagram yukleme basarisiz, tum denemeler tukenmis.")
-    return False
+            cl.logout()
+        except Exception:
+            pass
 
-# --- Main akış ---
+
+# ---------------------------
+# Ana akış
+# ---------------------------
 def main():
-    logging.info("Bot basladi.")
-    haber = haberleri_cek()
-    if not haber:
-        logging.info("Yeni haber bulunamadi.")
+    logging.info("Bot başlatılıyor...")
+    # Ortam değişkenleri
+    ig_user = os.environ.get("IG_USERNAME")
+    ig_pass = os.environ.get("IG_PASSWORD")
+
+    if not ig_user or not ig_pass:
+        logging.error("IG_USERNAME veya IG_PASSWORD ortam değişkenleri eksik.")
+        sys.exit(1)
+
+    entry = fetch_latest_entry(RSS_SOURCES)
+    if not entry:
+        logging.info("Gönderilecek haber bulunamadı. Çıkılıyor.")
         return
 
-    try:
-        ai_veri = ozgunlestir(haber)
-    except Exception:
-        logging.error("AI'den veri alinamadigi icin islem iptal ediliyor.")
-        return
+    # HTML oluştur
+    render_html_for_entry(entry, HTML_FILE)
 
+    # Screenshot al
     try:
-        resim = resim_olustur_from_design(ai_veri, haber.get('gorsel'))
+        make_screenshot_from_html(HTML_FILE, OUTPUT_IMAGE)
     except Exception as e:
-        logging.error("Resim olusturma hatasi: %s", e)
-        return
+        logging.error("Screenshot alınırken hata: %s", e)
+        sys.exit(1)
 
-    gecmiye_kaydet(haber['baslik'], resim)
+    # Caption hazırla (basit)
+    title = entry.get("title", "")
+    link = entry.get("link", "")
+    caption = f"{title}\n\nKaynak: {link}"
 
-    ok = instagram_yukle_instagrapi(resim, ai_veri)
-    if ok:
-        logging.info("Islem tamamlandi: %s", haber['baslik'])
-    else:
-        logging.error("Islem basarisiz: %s", haber['baslik'])
+    # Instagram'a yükle
+    try:
+        post_to_instagram(OUTPUT_IMAGE, caption, ig_user, ig_pass)
+    except Exception as e:
+        logging.error("Instagram'a yükleme başarısız: %s", e)
+        sys.exit(1)
+
+    logging.info("İşlem tamamlandı.")
+
 
 if __name__ == "__main__":
     main()
