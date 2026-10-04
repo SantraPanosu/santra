@@ -1,87 +1,53 @@
-name: Instagram Auto Post
+name: Haber Botu
 
 on:
   schedule:
-    - cron: '0 */3 * * *'
-  workflow_dispatch: {}
+    - cron: '0 9 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write  # <-- BU YETKİYİ MUTLAKA EKLEMELİSİN
 
 jobs:
-  post:
+  run-bot:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout repo
         uses: actions/checkout@v4
+      # ... (diğer adımlar)
+name: Santra Panosu Otomatik Haber Botu
 
-      - name: Set up Python
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.11'
+on:
+  schedule:
+    # Her 4 saatte bir otomatik çalışır (istediğin gibi değiştirebilirsin)
+    - cron: '0 */4 * * *'
+  workflow_dispatch: # Manuel olarak 'Run workflow' diyerek test edebilmeni sağlar
 
-      - name: Ensure system libraries for Playwright and Pillow
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends \
-            libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libxss1 \
-            libgbm1 libgtk-3-0 libx11-xcb1 libxcomposite1 libxdamage1 \
-            libxrandr2 libxrender1 libxcb1 libxext6 libx264-dev libffi-dev \
-            ca-certificates fonts-liberation libjpeg-dev zlib1g-dev \
-            libfreetype6-dev liblcms2-dev libwebp-dev
+jobs:
+  build:
+    runs-on: ubuntu-latest
 
-      - name: Install Python deps upgrade instagrapi first
-        run: |
-          python -m pip install --upgrade pip setuptools wheel
-          pip install --upgrade instagrapi
-          pip install -r requirements.txt
+    steps:
+    - name: Depoyu Kopyala (Checkout)
+      uses: actions/checkout@v4
 
-      - name: Install Playwright browsers
-        run: |
-          python -m playwright install chromium
+    - name: Python Kurulumu
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
 
-      - name: Restore IG session from secret (if provided)
-        run: |
-          echo "Attempting to restore IG session from IG_SESSION_B64 secret (if set)..."
-          if [ -n "${{ secrets.IG_SESSION_B64 }}" ]; then
-            # Try decode; don't fail the step on decode error
-            echo "${{ secrets.IG_SESSION_B64 }}" | base64 --decode > /tmp/ig_session.json 2>/tmp/ig_session.decode.err || true
-            if [ -s /tmp/ig_session.json ]; then
-              echo "IG session restored to /tmp/ig_session.json"
-            else
-              echo "IG_SESSION_B64 present but decode failed or produced empty file; skipping restore."
-              rm -f /tmp/ig_session.json /tmp/ig_session.decode.err || true
-            fi
-          else
-            echo "IG_SESSION_B64 secret not set; skipping restore."
-          fi
-        shell: bash
+    - name: Bağımlılıkları Yükle
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
 
-      - name: Download IG session artifact if exists
-        uses: actions/download-artifact@v4
-        with:
-          name: ig_session
-          path: /tmp
-        continue-on-error: true
+    - name: Playwright Tarayıcılarını Yükle
+      run: playwright install chromium
 
-      - name: List repository files debug
-        run: |
-          echo "Working dir: $(pwd)"
-          ls -la
-
-      - name: Run haber_botu
-        env:
-          IG_USERNAME: ${{ secrets.IG_USERNAME }}
-          IG_PASSWORD: ${{ secrets.IG_PASSWORD }}
-          IG_2FA_SECRET: ${{ secrets.IG_2FA_SECRET }}
-          IG_2FA_CODE: ${{ secrets.IG_2FA_CODE }}
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-        run: |
-          echo "Starting bot..."
-          python ./haber_botu.py
-
-      - name: Upload IG session artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ig_session
-          path: /tmp/ig_session.json
+    - name: Botu Çalıştır ve Paylaşım Yap
+      env:
+        IG_USERNAME: ${{ secrets.IG_USERNAME }}
+        IG_PASSWORD: ${{ secrets.IG_PASSWORD }}
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+      run: |
+        python haber_botu.py
