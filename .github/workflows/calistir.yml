@@ -2,7 +2,7 @@ name: Instagram Auto Post
 
 on:
   schedule:
-    - cron: '0 * * * *'
+    - cron: '0 */3 * * *'
   workflow_dispatch: {}
 
 jobs:
@@ -17,7 +17,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Ensure system libraries (for Playwright and Pillow)
+      - name: Ensure system libraries for Playwright and Pillow
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends \
@@ -27,7 +27,7 @@ jobs:
             ca-certificates fonts-liberation libjpeg-dev zlib1g-dev \
             libfreetype6-dev liblcms2-dev libwebp-dev
 
-      - name: Install Python deps (upgrade pip and instagrapi first)
+      - name: Install Python deps upgrade instagrapi first
         run: |
           python -m pip install --upgrade pip setuptools wheel
           pip install --upgrade instagrapi
@@ -37,14 +37,21 @@ jobs:
         run: |
           python -m playwright install chromium
 
-      - name: Download IG session (if exists)
+      - name: Restore IG session from secret if provided
+        if: ${{ secrets.IG_SESSION_B64 != '' }}
+        run: |
+          echo "Restoring IG session from secret..."
+          echo "${{ secrets.IG_SESSION_B64 }}" | base64 --decode > /tmp/ig_session.json
+        shell: bash
+
+      - name: Download IG session artifact if exists
         uses: actions/download-artifact@v4
         with:
           name: ig_session
           path: /tmp
         continue-on-error: true
 
-      - name: List repository files (debug)
+      - name: List repository files debug
         run: |
           echo "Working dir: $(pwd)"
           ls -la
@@ -62,7 +69,7 @@ jobs:
           echo "Starting bot..."
           python ./haber_botu.py
 
-      - name: Upload IG session
+      - name: Upload IG session artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
