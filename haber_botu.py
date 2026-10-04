@@ -31,8 +31,8 @@ YEDEK_GORSELLER = [
 
 HAFIZA_DOSYASI = "paylasilanlar.json"
 
-# Yasaklı kelimeler filtresi (Bahis, misli, iddaa vb.)
-YASAKLI_KELIMELER = ["misli", "iddaa", "bahis", "kupon", "oran", "casino", "slot", "yatırım", "bonus"]
+# Yasaklı kelimeler filtresi (Bahis, misli, iddaa, takvim programları vb.)
+YASAKLI_KELIMELER = ["misli", "iddaa", "bahis", "kupon", "oran", "casino", "slot", "yatırım", "bonus", "günün maçları", "hangi kanalda", "saat kaçta", "maç programı", "haftanın maçları", "yayın akışı"]
 
 def gecmisi_yukle():
     if os.path.exists(HAFIZA_DOSYASI):
@@ -73,7 +73,7 @@ def haberleri_cek():
                 baslik = entry.title
                 aciklama = entry.get('description', '')
                 
-                # Yasaklı kelime kontrolü (Bahis / Misli vb.)
+                # Yasaklı kelime kontrolü
                 metin_butun = (baslik + " " + aciklama).lower()
                 yasakli_varmi = any(kelime in metin_butun for kelime in YASAKLI_KELIMELER)
                 
@@ -102,7 +102,14 @@ def haberleri_cek():
 
 def ozgunlestir(haber):
     print("Groq yapay zeka devrede...")
-    prompt = "Su haberi incele ve SADECE JSON formatinda ver. Baska hicbir kelime yazma: {\"baslik\":\"kisa\",\"ozet\":\"1 cumle\",\"aciklama\":\"kisa\",\"detayli_metin\":\"uzun\"}. Haber: " + haber['baslik'] + " - " + haber['metin']
+    prompt = (
+        "Sen profesyonel ve güvenilir bir spor editörüsün. Aşağıdaki haberi dikkatlice incele. "
+        "Eğer haber takvim, 'Günün maçları', 'Maç programı' veya maç listesi gibi gerçek bir olay içermeyen içerikse; "
+        "bunu reddet ve yerine gerçek bir olay (transfer, sakatlık, röportaj, kriz, kulüp açıklaması) formatına çevir. "
+        "SADECE JSON formatinda ver, baska hicbir kelime yazma: "
+        "{\"baslik\":\"kisa\",\"ozet\":\"1 cumle\",\"aciklama\":\"kisa\",\"detayli_metin\":\"uzun\"}. "
+        "Haber: " + haber['baslik'] + " - " + haber['metin']
+    )
     
     chat = client.chat.completions.create(
         messages=[{"role": "user", "content": prompt}],
@@ -127,7 +134,7 @@ def resim_olustur(ai, gorsel):
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,700;0,900&family=Oswald:wght@500;700&display=swap');
         body, html { margin: 0; padding: 0; width: 1080px; height: 1080px; font-family: 'Montserrat', sans-serif; background-color: #161b22; display: flex; justify-content: center; align-items: center; overflow: hidden; }
         .instagram-post { width: 1080px; height: 1080px; position: relative; background: transparent; color: white; box-sizing: border-box; padding: 45px 60px 50px 60px; display: flex; flex-direction: column; justify-content: space-between; z-index: 1; }
-        .bg-image { position: absolute; top: -10%; left: -10%; width: 120%; height: 120%; background: url('IMG_URL') center/cover no-repeat; filter: blur(5px) brightness(0.52); z-index: -3; }
+        .bg-image { position: absolute; top: -10%; left: -10%; width: 120%; height: 120%; background: url('IMG_URL') center/cover no-repeat; filter: blur(3px) brightness(0.55); z-index: -3; }
         .header { display: flex; align-items: center; z-index: 2; }
         .logo-container { width: 150px; height: 150px; border-radius: 50%; overflow: hidden; border: 4px solid #3598db; box-shadow: 0 0 30px rgba(53, 152, 219, 0.4); background-color: #151a21; flex-shrink: 0; }
         .logo-container img { width: 100%; height: 100%; object-fit: contain; }
@@ -135,10 +142,10 @@ def resim_olustur(ai, gorsel):
         .header-text h1 { font-family: 'Oswald', sans-serif; font-size: 64px; margin: 0; line-height: 0.95; text-transform: uppercase; letter-spacing: 2px; }
         .text-green { color: #5ad54e; }
         .text-white { color: #ffffff; }
-        .content-card { width: 100%; height: 500px; background: rgba(22, 27, 34, 0.85); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border: 2px solid rgba(53, 152, 219, 0.3); border-radius: 30px; padding: 35px 45px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 25px 50px rgba(0,0,0,0.6); position: relative; overflow: hidden; box-sizing: border-box; }
+        .content-card { width: 100%; height: 440px; background: rgba(22, 27, 34, 0.85); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); border: 2px solid rgba(53, 152, 219, 0.3); border-radius: 30px; padding: 30px 45px; display: flex; flex-direction: column; justify-content: center; box-shadow: 0 25px 50px rgba(0,0,0,0.6); position: relative; overflow: hidden; box-sizing: border-box; }
         .content-card::before { content: ''; position: absolute; left: 0; top: 0; width: 12px; height: 100%; background: linear-gradient(to bottom, #5ad54e, #3598db); }
-        .category-badge { display: inline-block; background-color: #5ad54e; color: #161b22; font-weight: 900; font-size: 20px; padding: 5px 18px; border-radius: 8px; margin-bottom: 15px; text-transform: uppercase; align-self: flex-start; box-shadow: 0 0 20px rgba(90, 213, 78, 0.3); }
-        .news-title { font-size: 40px; font-weight: 900; line-height: 1.2; margin: 0 0 15px 0; text-transform: uppercase; color: #ffffff; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+        .category-badge { display: inline-block; background-color: #5ad54e; color: #161b22; font-weight: 900; font-size: 20px; padding: 5px 18px; border-radius: 8px; margin-bottom: 12px; text-transform: uppercase; align-self: flex-start; box-shadow: 0 0 20px rgba(90, 213, 78, 0.3); }
+        .news-title { font-size: 40px; font-weight: 900; line-height: 1.2; margin: 0 0 12px 0; text-transform: uppercase; color: #ffffff; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
         .news-body { font-size: 24px; line-height: 1.4; color: #e0e0e0; margin: 0; font-weight: 400; }
         .watermark { position: absolute; bottom: -30px; right: -30px; font-size: 200px; font-weight: 900; color: rgba(255,255,255,0.02); z-index: 0; pointer-events: none; font-family: 'Oswald', sans-serif; text-transform: uppercase; }
     [/style]
