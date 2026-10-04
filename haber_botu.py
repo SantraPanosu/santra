@@ -1,3 +1,4 @@
+Python
 import os, random, re, json, subprocess, time, feedparser
 from groq import Groq
 from playwright.sync_api import sync_playwright
@@ -95,7 +96,7 @@ def haberleri_cek():
                         if img_match:
                             gorsel_url = img_match.group(1)
                     
-                    # Sadece habere ait görseli bulunanları listeye ekle (Uydurma/rastgele resim olmasın)
+                    # Sadece habere ait görseli bulunanları listeye ekle
                     if gorsel_url:
                         haberler.append({'baslik': baslik, 'metin': aciklama, 'gorsel': gorsel_url})
         except Exception:
