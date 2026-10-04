@@ -162,7 +162,7 @@ def post_to_instagram(image_path: Path, caption: str, username: str, password: s
     logging.info("Instagram'a giriş denemesi: %s", username)
     cl = Client()
     try:
-        cl.user_agent = "Instagram 300.0.0.0 Android (30/11; 420dpi; 1080x2340; OnePlus; OnePlus6T; OnePlus6T; qcom; tr_TR)"
+        cl.user_agent = "Instagram 300.1.0.39.119 Android (31/12; 480dpi; 1080x2400; Samsung; SM-G991B; SM-G991B; qcom; tr_TR)"
     except Exception:
         pass
 
