@@ -118,8 +118,39 @@ def ozgunlestir(haber):
 def resim_olustur(ai, gorsel):
     print("Tasarim giydiriliyor...")
     
-    sablon = "[html][body style='background:url(\"IMG_URL\");background-size:cover;color:#fff;padding:50px;font-family:sans-serif;'][div style='background:rgba(0,0,0,0.7);padding:40px;border-radius:20px;'][h1 style='font-size:3.5em']BASLIK[/h1][h2 style='color:#f39c12;font-size:2.5em']OZET[/h2][p style='font-size:1.8em']ACIKLAMA[/p][/div][/body][/html]"
+    # SENIN TASARIMININ BİREBİR AYNISI (Özel kodlama ile)
+    sablon = """[html]
+    [head]
+    [style]
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700;900&display=swap');
+        body { margin: 0; width: 1080px; height: 1080px; font-family: 'Montserrat', sans-serif; position: relative; overflow: hidden; }
+        .bg-image { position: absolute; top: -5%; left: -5%; width: 110%; height: 110%; background: url('IMG_URL') center/cover no-repeat; filter: blur(15px) brightness(0.35); z-index: 1; }
+        .container { position: relative; z-index: 2; height: 1080px; display: flex; flex-direction: column; justify-content: space-between; padding: 60px; box-sizing: border-box; }
+        .logo-container { font-size: 55px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase; }
+        .logo-santra { color: #00e5ff; }
+        .logo-panosu { color: #ff7f00; }
+        .card { background-color: #0b121d; border-radius: 20px; padding: 50px; border-left: 12px solid #00e5ff; box-shadow: -5px 0px 40px rgba(0, 229, 255, 0.3); }
+        .badge { display: inline-block; background-color: #ff7f00; color: white; padding: 12px 24px; border-radius: 8px; font-weight: 700; font-size: 24px; margin-bottom: 30px; text-transform: uppercase; }
+        .title { color: white; font-size: 50px; font-weight: 900; line-height: 1.2; margin: 0 0 25px 0; text-transform: uppercase; }
+        .summary { color: #00e5ff; font-size: 32px; font-weight: 700; line-height: 1.4; margin: 0 0 25px 0; }
+        .desc { color: #d1d5db; font-size: 26px; font-weight: 500; line-height: 1.5; margin: 0; }
+    [/style]
+    [/head]
+    [body]
+        [div class='bg-image'][/div]
+        [div class='container']
+            [div class='logo-container'][span class='logo-santra']SANTRA[/span] [span class='logo-panosu']PANOSU[/span][/div]
+            [div class='card']
+                [div class='badge']SPOR GÜNDEMİ[/div]
+                [h1 class='title']BASLIK[/h1]
+                [h2 class='summary']OZET[/h2]
+                [p class='desc']ACIKLAMA[/p]
+            [/div]
+        [/div]
+    [/body]
+    [/html]"""
     
+    # Parantezleri güvenlice HTML'e çeviriyoruz
     html_icerik = sablon.replace("[", "<").replace("]", ">")
     html_icerik = html_icerik.replace("IMG_URL", gorsel)
     html_icerik = html_icerik.replace("BASLIK", ai["baslik"])
@@ -195,7 +226,6 @@ def instagram_yukle(resim, ai):
             print("Instagram giris/paylasiminda takildi!")
             print("Hata detayi:", str(e))
             
-            # BURASI YENİ: Hata ekranını GitHub'a fırlatır!
             try:
                 subprocess.run(["git", "add", hata_yolu], check=True)
                 subprocess.run(["git", "commit", "-m", "Hata ekrani eklendi [skip ci]"], check=True)
