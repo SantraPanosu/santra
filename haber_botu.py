@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # haber_botu.py
-# Instagram haber botu — RSS çek, HTML oluştur, screenshot al, Instagram'a yükle
-# TOTP (IG_2FA_SECRET) destekli, retry + exponential backoff, session persistence
+# RSS çek, HTML oluştur, screenshot al, Instagram'a yükle
+# Session reuse ve TOTP destekli
 
 import os
 import sys
@@ -16,9 +16,7 @@ import feedparser
 from playwright.sync_api import sync_playwright
 from instagrapi import Client
 
-# ---------------------------
 # RSS kaynakları
-# ---------------------------
 RSS_SOURCES = [
     "https://www.fanatik.com.tr/rss/anasayfa",
     "https://www.fotomac.com.tr/rss/anasayfa.xml",
@@ -37,9 +35,7 @@ RSS_SOURCES = [
     "https://www.yenisafak.com/rss/spor"
 ]
 
-# ---------------------------
 # Ayarlar
-# ---------------------------
 OUTPUT_DIR = Path(tempfile.gettempdir()) / "haber_botu"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_IMAGE = OUTPUT_DIR / "haber.jpg"
@@ -52,9 +48,6 @@ logging.basicConfig(
     handlers=[logging.StreamHandler(sys.stdout)]
 )
 
-# ---------------------------
-# RSS çekme
-# ---------------------------
 def fetch_latest_entry(sources):
     logging.info("RSS kaynaklarından haber çekiliyor...")
     for url in sources:
@@ -70,29 +63,19 @@ def fetch_latest_entry(sources):
                 published = entry.get("published", entry.get("updated", ""))
                 if not title or not link:
                     continue
-                candidate = {
-                    "title": title,
-                    "link": link,
-                    "summary": summary,
-                    "published": published
-                }
                 logging.info("Haber bulundu: %s (kaynak: %s)", title, url)
-                return candidate
+                return {"title": title, "link": link, "summary": summary, "published": published}
         except Exception as e:
             logging.warning("RSS parse hatası %s: %s", url, e)
     logging.info("Hiçbir uygun haber bulunamadı.")
     return None
 
-# ---------------------------
-# HTML oluşturma
-# ---------------------------
 def render_html_for_entry(entry, html_path: Path):
     title = entry.get("title", "")
     summary = entry.get("summary", "")
     link = entry.get("link", "")
     published = entry.get("published", "")
     now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-
     html = f"""<!doctype html>
 <html lang="tr">
 <head>
@@ -126,9 +109,6 @@ def render_html_for_entry(entry, html_path: Path):
     html_path.write_text(html, encoding="utf-8")
     logging.info("HTML dosyası oluşturuldu: %s", html_path)
 
-# ---------------------------
-# Playwright ile screenshot alma
-# ---------------------------
 def make_screenshot_from_html(html_path: Path, output_image: Path):
     logging.info("Playwright ile screenshot alınıyor...")
     with sync_playwright() as p:
@@ -147,18 +127,8 @@ def make_screenshot_from_html(html_path: Path, output_image: Path):
         browser.close()
     logging.info("Screenshot alındı: %s", output_image)
 
-# ---------------------------
-# Instagram'a yükleme (güncel, fallback'li)
-# ---------------------------
 def post_to_instagram(image_path: Path, caption: str, username: str, password: str,
-                      max_retries: int = 6, base_delay: float = 5.0):
-    """
-    Instagram login + upload:
-    - retry + exponential backoff
-    - TOTP destekli (IG_2FA_SECRET veya IG_2FA_CODE)
-    - fallback: eğer instagrapi.login() two_factor_callback kabul etmiyorsa,
-      otomatik TOTP üretip verification_code veya two_factor_login ile deneyecek.
-    """
+                      max_retries: int = 6, base_delay: float = 30.0):
     logging.info("Instagram'a giriş denemesi: %s", username)
     cl = Client()
     try:
@@ -193,24 +163,20 @@ def post_to_instagram(image_path: Path, caption: str, username: str, password: s
 
     session_file = Path(tempfile.gettempdir()) / "ig_session.json"
 
-    # LOGIN RETRY with fallback for instagrapi versions
     for attempt in range(1, max_retries + 1):
         try:
             if session_file.exists():
                 logging.info("Kayıtlı session yükleniyor: %s", session_file)
                 cl.load_settings(str(session_file))
 
-            # İlk tercih: modern instagrapi with two_factor_callback
             try:
                 cl.login(username, password, two_factor_callback=two_factor_callback, challenge_handler=challenge_handler)
                 logging.info("Instagram login başarılı (two_factor_callback).")
                 break
             except TypeError as te:
-                # Eğer login() unexpected keyword arg hatası veriyorsa fallback yap
                 msg = str(te).lower()
                 if "unexpected keyword" in msg or "two_factor_callback" in msg:
                     logging.warning("two_factor_callback desteklenmiyor, fallback yöntemleri deneniyor.")
-                    # Fallback 1: verification_code param ile login (bazı sürümlerde desteklenir)
                     code = get_totp_code()
                     if code:
                         try:
@@ -219,17 +185,14 @@ def post_to_instagram(image_path: Path, caption: str, username: str, password: s
                             break
                         except Exception as e_ver:
                             logging.warning("verification_code ile login başarısız: %s", e_ver)
-                    # Fallback 2: two_factor_login metodu (bazı sürümlerde mevcut)
                     try:
                         code = get_totp_code()
                         if code:
-                            # some instagrapi versions have two_factor_login(username, password, verification_code)
                             try:
                                 cl.two_factor_login(username, password, code)
                                 logging.info("Instagram login başarılı (two_factor_login).")
                                 break
                             except TypeError:
-                                # some variants accept only code
                                 try:
                                     cl.two_factor_login(code)
                                     logging.info("Instagram login başarılı (two_factor_login code-only).")
@@ -238,13 +201,10 @@ def post_to_instagram(image_path: Path, caption: str, username: str, password: s
                                     logging.warning("two_factor_login fallback başarısız: %s", e_tf)
                     except Exception as e:
                         logging.warning("two_factor_login denemesi hata verdi: %s", e)
-                    # Eğer tüm fallbackler başarısızsa, raise or continue to backoff
                     raise te
                 else:
-                    # TypeError farklıysa yeniden raise et
                     raise
             except Exception as e:
-                # Normal hata (ör. 400, 429, challenge_required vb.)
                 raise
 
         except Exception as e:
@@ -267,14 +227,12 @@ def post_to_instagram(image_path: Path, caption: str, username: str, password: s
                 logging.error("Login için maksimum deneme sayısına ulaşıldı.")
                 raise
 
-    # Başarılı login sonrası session kaydet
     try:
         cl.dump_settings(str(session_file))
         logging.info("Session kaydedildi: %s", session_file)
     except Exception:
         logging.debug("Session kaydetme başarısız, devam ediliyor.")
 
-    # UPLOAD RETRY
     for attempt in range(1, max_retries + 1):
         try:
             media = cl.photo_upload(str(image_path), caption)
@@ -298,14 +256,10 @@ def post_to_instagram(image_path: Path, caption: str, username: str, password: s
     except Exception:
         pass
 
-# ---------------------------
-# Ana akış
-# ---------------------------
 def main():
     logging.info("Bot başlatılıyor...")
     ig_user = os.environ.get("IG_USERNAME")
     ig_pass = os.environ.get("IG_PASSWORD")
-
     if not ig_user or not ig_pass:
         logging.error("IG_USERNAME veya IG_PASSWORD ortam değişkenleri eksik.")
         sys.exit(1)
