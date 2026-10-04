@@ -4,69 +4,37 @@
     <meta charset="UTF-8">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        body { 
-            margin: 0; padding: 0; background-color: #0f111a; 
-            display: flex; justify-content: center; align-items: center; 
-            height: 100vh; 
-        }
-        .card { 
-            width: 1080px; height: 1080px; position: relative; 
-            font-family: 'Montserrat', sans-serif; overflow: hidden; 
-            background-color: #0f111a;
-        }
-        .bg-image {
-            position: absolute;
-            top: -20px; left: -20px; right: -20px; bottom: -20px;
-            background-image: url('ARKA_PLAN_GORSELI_BURAYA'); 
-            background-size: cover; 
-            background-position: center;
-            filter: blur(8px) brightness(0.5);
-            transform: scale(1.05);
-        }
-        .overlay { 
-            position: absolute; top: 0; left: 0; right: 0; bottom: 0; 
-            background: linear-gradient(to top, rgba(10, 15, 36, 0.95) 10%, rgba(10, 15, 36, 0.6) 50%, rgba(10, 15, 36, 0.3) 100%); 
-        }
-        .brand { 
-            position: absolute; top: 40px; left: 50px; 
-            font-size: 42px; font-weight: 900; text-transform: uppercase; 
-            letter-spacing: 2px; z-index: 2;
-        }
+        body { margin: 0; padding: 0; background-color: #0f111a; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        
+        .card { width: 1080px; height: 1080px; position: relative; font-family: 'Montserrat', sans-serif; overflow: hidden; background-image: url('https://images.unsplash.com/photo-1518605368461-1e1e12db801b?q=80&w=1080&auto=format&fit=crop'); background-size: cover; background-position: center; }
+        
+        .overlay { position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: linear-gradient(to top, rgba(10, 15, 36, 1) 5%, rgba(10, 15, 36, 0.7) 50%, rgba(10, 15, 36, 0.1) 100%); }
+        
+        .brand { position: absolute; top: 40px; left: 50px; font-size: 42px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; }
         .brand-santra { color: #00d2ff; text-shadow: 0 0 15px rgba(0, 210, 255, 0.6); }
         .brand-panosu { color: #ff7f00; text-shadow: 0 0 15px rgba(255, 127, 0, 0.6); }
         
-        .content { 
-            position: absolute; bottom: 50px; left: 50px; right: 50px; 
-            background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(15px); 
-            border-left: 8px solid #00d2ff; border-radius: 16px; 
-            padding: 40px; color: white; box-shadow: 0 20px 40px rgba(0,0,0,0.5); 
-            z-index: 2;
-        }
-        .tag { 
-            display: inline-block; background: #ff7f00; color: white; 
-            font-weight: 700; padding: 10px 20px; border-radius: 8px; 
-            font-size: 22px; margin-bottom: 25px; text-transform: uppercase; 
-            letter-spacing: 1px; box-shadow: 0 0 15px rgba(255, 127, 0, 0.4); 
-        }
-        .title { font-size: 50px; font-weight: 900; line-height: 1.2; margin: 0 0 20px 0; }
-        .summary { font-size: 28px; font-weight: 700; color: #00d2ff; margin: 0 0 15px 0; }
-        .description { font-size: 24px; font-weight: 400; line-height: 1.5; color: #d1d5db; margin: 0; }
+        .content { position: absolute; bottom: 50px; left: 50px; right: 50px; background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(15px); border-left: 8px solid #00d2ff; border-radius: 16px; padding: 40px; color: white; box-shadow: 0 20px 40px rgba(0,0,0,0.5); }
+        
+        .tag { display: inline-block; background: #ff7f00; color: white; font-weight: 700; padding: 10px 20px; border-radius: 8px; font-size: 22px; margin-bottom: 25px; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 0 15px rgba(255, 127, 0, 0.4); }
+        
+        .title { font-size: 54px; font-weight: 900; line-height: 1.2; margin: 0 0 20px 0; }
+        .summary { font-size: 30px; font-weight: 700; color: #00d2ff; margin: 0 0 15px 0; }
+        .description { font-size: 26px; font-weight: 400; line-height: 1.5; color: #d1d5db; margin: 0; }
     </style>
 </head>
 <body>
     <div class="card">
-        <div class="bg-image"></div>
         <div class="overlay"></div>
-        
         <div class="brand">
             <span class="brand-santra">SANTRA</span> <span class="brand-panosu">PANOSU</span>
         </div>
         
         <div class="content">
             <div class="tag">SPOR GÜNDEMİ</div>
-            <h1 class="title">BASLIK_BURAYA</h1>
-            <p class="summary">OZET_BURAYA</p>
-            <p class="description">ACIKLAMA_BURAYA</p>
+            <h1 class="title">Beşiktaş'tan Flaş Hamle: Kadro Planlamasında Yeni Hedefler Belli Oldu!</h1>
+            <p class="summary">Siyah-beyazlı yönetim, transfer döneminin kapanmasına kısa süre kala eksik bölgeler için düğmeye bastı.</p>
+            <p class="description">Teknik heyetin sunduğu detaylı rapor doğrultusunda hareket eden komite, alternatifli bir oyuncu havuzu oluşturdu. Gelişmelerin hafta sonuna kadar netleşmesi bekleniyor.</p>
         </div>
     </div>
 </body>
