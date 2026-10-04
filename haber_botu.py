@@ -200,8 +200,20 @@ def resim_olustur_from_design(ai, gorsel_url):
         browser = p.chromium.launch(args=["--no-sandbox"], headless=True)
         page = browser.new_page(viewport={"width": 1080, "height": 1080})
         page.goto("file://" + html_path)
-        page.wait_for_load_state("networkidle")
-        page.wait_for_timeout(500)
+page.wait_for_load_state("networkidle")
+
+# Google Fonts'un yüklenmesini bekle (document.fonts.ready)
+try:
+    page.wait_for_function("document.fonts.ready.then(()=>true)", timeout=8000)
+except Exception:
+    # Eğer fonts.ready Promise'i beklenemez veya timeout olursa kısa bir ek bekleme yap
+    page.wait_for_timeout(500)
+
+# Küçük ek bekleme, fontların render'ı için güvenlik
+page.wait_for_timeout(300)
+
+page.screenshot(path=OUTPUT_IMAGE, type="jpeg", quality=90)
+
         page.screenshot(path=OUTPUT_IMAGE, type="jpeg", quality=90)
         browser.close()
     return os.path.abspath(OUTPUT_IMAGE)
