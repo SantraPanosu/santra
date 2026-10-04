@@ -118,7 +118,6 @@ def ozgunlestir(haber):
 def resim_olustur(ai, gorsel):
     print("Tasarim giydiriliyor...")
     
-    # Arayuz bozmasin diye HTML etiketlerini koseli parantezle yazdik, Python bunu HTML'e cevirecek.
     sablon = "[html][body style='background:url(\"IMG_URL\");background-size:cover;color:#fff;padding:50px;font-family:sans-serif;'][div style='background:rgba(0,0,0,0.7);padding:40px;border-radius:20px;'][h1 style='font-size:3.5em']BASLIK[/h1][h2 style='color:#f39c12;font-size:2.5em']OZET[/h2][p style='font-size:1.8em']ACIKLAMA[/p][/div][/body][/html]"
     
     html_icerik = sablon.replace("[", "<").replace("]", ">")
@@ -193,8 +192,18 @@ def instagram_yukle(resim, ai):
         except Exception as e:
             hata_yolu = os.path.join(os.getcwd(), "hata_ekrani.png")
             page.screenshot(path=hata_yolu)
-            print("Instagram giris/paylasiminda takildi! Ekran goruntusu: hata_ekrani.png")
+            print("Instagram giris/paylasiminda takildi!")
             print("Hata detayi:", str(e))
+            
+            # BURASI YENİ: Hata ekranını GitHub'a fırlatır!
+            try:
+                subprocess.run(["git", "add", hata_yolu], check=True)
+                subprocess.run(["git", "commit", "-m", "Hata ekrani eklendi [skip ci]"], check=True)
+                subprocess.run(["git", "push"], check=True)
+                print(">>> hata_ekrani.png GitHub depona yuklendi! Lutfen depodan o resme bak.")
+            except Exception as git_err:
+                print("Hata resmi GitHub'a yuklenemedi:", git_err)
+                
         finally:
             b.close()
 
