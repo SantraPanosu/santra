@@ -31,6 +31,9 @@ YEDEK_GORSELLER = [
 
 HAFIZA_DOSYASI = "paylasilanlar.json"
 
+# Yasaklı kelimeler filtresi (Bahis, misli, iddaa vb.)
+YASAKLI_KELIMELER = ["misli", "iddaa", "bahis", "kupon", "oran", "casino", "slot", "yatırım", "bonus"]
+
 def gecmisi_yukle():
     if os.path.exists(HAFIZA_DOSYASI):
         with open(HAFIZA_DOSYASI, "r", encoding="utf-8") as f:
@@ -59,23 +62,28 @@ def gecmiye_kaydet(baslik, resim_yolu, aciklama_yolu):
         print("Git kayit uyarisi:", e)
 
 def haberleri_cek():
-    print("Haberler taraniyor...")
+    print("Haberler taraniyor ve filtreleniyor...")
     paylasilanlar = gecmisi_yukle()
     haberler = []
     
     for rss in RSS_KAYNAKLARI:
         try:
             feed = feedparser.parse(rss)
-            for entry in feed.entries[:3]:
+            for entry in feed.entries[:5]:
                 baslik = entry.title
-                if baslik not in paylasilanlar:
+                aciklama = entry.get('description', '')
+                
+                # Yasaklı kelime kontrolü (Bahis / Misli vb.)
+                metin_butun = (baslik + " " + aciklama).lower()
+                yasakli_varmi = any(kelime in metin_butun for kelime in YASAKLI_KELIMELER)
+                
+                if not yasakli_varmi and baslik not in paylasilanlar:
                     gorsel_url = random.choice(YEDEK_GORSELLER)
                     if 'media_content' in entry:
                         gorsel_url = entry.media_content[0]['url']
                     elif 'enclosures' in entry and len(entry.enclosures) > 0:
                         gorsel_url = entry.enclosures[0]['href']
                     
-                    aciklama = entry.get('description', '')
                     if gorsel_url in YEDEK_GORSELLER:
                         img_match = re.search(r'src=["\'](https?://[^"\']+\.(?:jpg|jpeg|png|webp))["\']', aciklama, re.IGNORECASE)
                         if img_match: gorsel_url = img_match.group(1)
@@ -85,11 +93,11 @@ def haberleri_cek():
             pass
             
     if not haberler:
-        print("UYARI: Paylasilacak yeni haber bulunamadi!")
+        print("UYARI: Paylasilacak uygun haber bulunamadi!")
         return None
         
     secilen = random.choice(haberler)
-    print("SECILEN HABER: " + secilen['baslik'])
+    print("SECILEN TEMIZ HABER: " + secilen['baslik'])
     return secilen
 
 def ozgunlestir(haber):
