@@ -157,38 +157,49 @@ def instagram_yukle(resim, ai):
         )
         page = context.new_page()
         
-        page.goto("https://www.instagram.com/accounts/login/", timeout=60000)
-        time.sleep(5)
-        
-        page.wait_for_selector("input[name='username']", timeout=15000)
-        page.locator("input[name='username']").fill(IG_USERNAME)
-        page.locator("input[name='password']").fill(IG_PASSWORD)
-        page.locator("button[type='submit']").click()
-        time.sleep(10)
-        
-        page.goto("https://www.instagram.com/create/style/", timeout=60000)
-        time.sleep(5)
-        
-        page.locator("input[type='file']").set_input_files(resim)
-        time.sleep(3)
-        
-        for _ in range(2):
+        try:
+            print("Instagram'a baglaniliyor...")
+            page.goto("https://www.instagram.com/accounts/login/", timeout=60000)
+            time.sleep(5)
+            
+            # Çerez (Cookie) onay ekranı çıkarsa kapatmayı dene
             try:
-                page.locator("button:has-text('İleri'), button:has-text('Next')").click()
+                page.locator("button:has-text('Allow all cookies'), button:has-text('Tüm çerezlere izin ver'), button:has-text('Decline optional cookies')").click(timeout=3000)
                 time.sleep(2)
-            except Exception:
+                print("Cerez penceresi kapatildi.")
+            except:
                 pass
                 
-        page.locator("div[aria-label='Write a caption...'], textarea").fill(caption)
-        time.sleep(2)
-        page.locator("button:has-text('Paylaş'), button:has-text('Share')").click()
-        time.sleep(10)
-        b.close()
-
-if __name__ == "__main__":
-    h = haberleri_cek()
-    if h:
-        ai_veri = yapay_zeka_ile_ozgunlestir(h)
-        resim = resim_olustur(ai_veri, h['gorsel_url'])
-        gecmiye_kaydet(h['orjinal_baslik'], resim)
-        instagram_yukle(resim, ai_veri)
+            page.wait_for_selector("input[name='username']", timeout=15000)
+            page.locator("input[name='username']").fill(IG_USERNAME)
+            page.locator("input[name='password']").fill(IG_PASSWORD)
+            page.locator("button[type='submit']").click()
+            time.sleep(10)
+            
+            page.goto("https://www.instagram.com/create/style/", timeout=60000)
+            time.sleep(5)
+            
+            page.locator("input[type='file']").set_input_files(resim)
+            time.sleep(3)
+            
+            for _ in range(2):
+                try:
+                    page.locator("button:has-text('İleri'), button:has-text('Next')").click(timeout=3000)
+                    time.sleep(2)
+                except Exception:
+                    pass
+                    
+            page.locator("div[aria-label='Write a caption...'], textarea").fill(caption)
+            time.sleep(2)
+            page.locator("button:has-text('Paylaş'), button:has-text('Share')").click()
+            time.sleep(10)
+            print("Instagram yuklemesi basarili!")
+            
+        except Exception as e:
+            # HATA DURUMUNDA EKRAN GÖRÜNTÜSÜ AL
+            hata_yolu = os.path.join(os.getcwd(), "hata_ekrani.png")
+            page.screenshot(path=hata_yolu)
+            print("Instagram giris veya paylasim sirasinda takildi! Ekran goruntusu 'hata_ekrani.png' olarak kaydedildi.")
+            print("Hata detayi:", str(e))
+        finally:
+            b.close()
