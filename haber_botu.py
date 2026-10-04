@@ -1,5 +1,4 @@
-Python
-import os, random, re, json, subprocess, time, feedparser
+import os, random, re, json, subprocess, base64, feedparser
 from groq import Groq
 from playwright.sync_api import sync_playwright
 
@@ -10,7 +9,7 @@ if not GROQ_API_KEY:
 
 client = Groq(api_key=GROQ_API_KEY)
 
-# Sadece saf spor ve futbol odaklı RSS kaynakları
+# Tüm ana spor ve futbol RSS kaynakları
 RSS_KAYNAKLARI = [
     "https://www.fanatik.com.tr/rss/anasayfa",
     "https://www.fotomac.com.tr/rss/anasayfa.xml",
@@ -25,7 +24,7 @@ RSS_KAYNAKLARI = [
 
 HAFIZA_DOSYASI = "paylasilanlar.json"
 
-# Yasaklı kelimeler filtresi (Bahis, misli, iddaa vb.)
+# Yasaklı kelimeler filtresi (Bahis, iddaa, maç programı vb.)
 YASAKLI_KELIMELER = ["misli", "iddaa", "bahis", "kupon", "oran", "casino", "slot", "yatırım", "bonus", "günün maçları", "hangi kanalda", "saat kaçta", "maç programı", "haftanın maçları", "yayın akışı"]
 
 def gecmisi_yukle():
@@ -38,8 +37,9 @@ def gecmisi_yukle():
 def gecmiye_kaydet(baslik, resim_yolu, aciklama_yolu):
     print("Hafiza ve dosyalar guncelleniyor...")
     paylasilanlar = gecmisi_yukle()
-    paylasilanlar.append(baslik)
-    if len(paylasilanlar) > 150: paylasilanlar = paylasilanlar[-150:]
+    if baslik not in paylasilanlar:
+        paylasilanlar.append(baslik)
+    if len(paylasilanlar) > 200: paylasilanlar = paylasilanlar[-200:]
     with open(HAFIZA_DOSYASI, "w", encoding="utf-8") as f:
         json.dump(paylasilanlar, f, ensure_ascii=False, indent=4)
     
@@ -49,32 +49,35 @@ def gecmiye_kaydet(baslik, resim_yolu, aciklama_yolu):
         subprocess.run(["git", "add", HAFIZA_DOSYASI], check=True)
         if os.path.exists(resim_yolu): subprocess.run(["git", "add", resim_yolu], check=True)
         if os.path.exists(aciklama_yolu): subprocess.run(["git", "add", aciklama_yolu], check=True)
-        subprocess.run(["git", "commit", "-m", "Yeni spor haberi hazirlandi (SahaEkrani) [skip ci]"], check=True)
+        subprocess.run(["git", "commit", "-m", "Yeni guncel spor haberi hazirlandi (SahaEkrani) [skip ci]"], check=True)
         subprocess.run(["git", "push"], check=True)
         print("Tum dosyalar GitHub'a kaydedildi!")
     except Exception as e:
         print("Git kayit uyarisi:", e)
 
 def haberleri_cek():
-    print("Haberler ve gercek haber gorselleri taraniyor...")
+    print("Tum RSS siteleri tek tek taranıyor ve en yeniler filtreleniyor...")
     paylasilanlar = gecmisi_yukle()
-    haberler = []
+    tum_adaylar = []
     
+    # Bütün siteleri sırayla tarıyoruz
     for rss in RSS_KAYNAKLARI:
         try:
             feed = feedparser.parse(rss)
-            for entry in feed.entries[:8]:
-                baslik = entry.title
+            # Her sitenin en taze ilk 5 haberini alıyoruz
+            for entry in feed.entries[:5]:
+                baslik = entry.title.strip()
                 aciklama = entry.get('description', '')
                 
                 # Yasaklı kelime kontrolü
                 metin_butun = (baslik + " " + aciklama).lower()
                 yasakli_varmi = any(kelime in metin_butun for kelime in YASAKLI_KELIMELER)
                 
+                # Daha önce paylaşılmamış ve yasaklı içermeyenleri topluyoruz
                 if not yasakli_varmi and baslik not in paylasilanlar:
                     gorsel_url = None
                     
-                    # RSS kaynağından haberin KENDİ orijinal görselini almaya çalışıyoruz
+                    # Habere ait orijinal görseli bulma
                     if hasattr(entry, 'media_content') and entry.media_content:
                         gorsel_url = entry.media_content[0].get('url')
                     elif hasattr(entry, 'media_thumbnail') and entry.media_thumbnail:
@@ -96,28 +99,29 @@ def haberleri_cek():
                         if img_match:
                             gorsel_url = img_match.group(1)
                     
-                    # Sadece habere ait görseli bulunanları listeye ekle
                     if gorsel_url:
-                        haberler.append({'baslik': baslik, 'metin': aciklama, 'gorsel': gorsel_url})
-        except Exception:
+                        tum_adaylar.append({'baslik': baslik, 'metin': aciklama, 'gorsel': gorsel_url})
+        except Exception as e:
+            print(f"RSS tarama hatasi ({rss}):", e)
             pass
             
-    if not haberler:
-        print("UYARI: Habere ait gorsel bulunamadi!")
+    if not tum_adaylar:
+        print("UYARI: Paylasilmamis yeni haber bulunamadi!")
         return None
         
-    secilen = random.choice(haberler)
-    print("SECILEN GERCEK GORSELLI HABER: " + secilen['baslik'])
+    # Sitelerden toplanan taze haberler arasından en yeniyi/rastgeleyi seçiyoruz
+    secilen = tum_adaylar[0]  # Feed sıralamasında en üstte olan en yenidir
+    print("SEÇİLEN EN YENİ VE BENZERSİZ HABER: " + secilen['baslik'])
     return secilen
 
 def ozgunlestir(haber):
     print("Groq yapay zeka devrede (Kesin Gerçeklik Modu)...")
     prompt = (
-        "Sen titiz ve güvenilir bir spor haber editörüsün. Aşağıdaki RSS haberini al ve KESİNLİKLE KAFANDAN YENİ BİR BİLGİ, TRANSFER VEYA RAKAM UYDURMADAN özetle. "
-        "Asla metinde geçmeyen hayali transferler, uydurma bonservis bedelleri veya yanlış bilgiler ekleme. "
-        "Sadece ve sadece verilen kaynak metindeki gerçekleri ve başlığı baz alarak sadeleştir. "
+        "Sen profesyonel bir spor editörüsün. Aşağıdaki güncel haberi incele. "
+        "KESİNLİKLE KAFANDAN YENİ BİRŞEY, UYDURMA TRANSFER VEYA RAKAM EKLEME. "
+        "Sadece verilen kaynak metindeki gerçekleri baz alarak düzenle. "
         "SADECE JSON formatinda ver, baska hicbir kelime yazma: "
-        "{\"baslik\":\"orijinal veya gercekci baslik\",\"ozet\":\"metne sadik 1 cumlelik ozet\",\"aciklama\":\"kisa\",\"detayli_metin\":\"gercek metin detayi\"}. "
+        "{\"baslik\":\"orijinal baslik\",\"ozet\":\"1 cumlelik ozet\",\"aciklama\":\"kisa\",\"detayli_metin\":\"detay\"}. "
         "Kaynak Başlık: " + haber['baslik'] + " | Kaynak Metin: " + haber['metin']
     )
     
@@ -137,14 +141,21 @@ def ozgunlestir(haber):
     return json.loads(temiz_metin)
 
 def resim_olustur(ai, gorsel):
-    print("SahaEkrani tasarimi giydiriliyor...")
+    print("SahaEkrani tasarimi giydiriliyor (Net Gorsel & Logo)...")
+    
+    logo_base64 = ""
+    if os.path.exists("LOGO.jpeg"):
+        with open("LOGO.jpeg", "rb") as f:
+            logo_base64 = base64.b64encode(f.read()).decode('utf-8')
+    logo_src = f"data:image/jpeg;base64,{logo_base64}" if logo_base64 else ""
+
     sablon = """[html]
     [head]
     [style]
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,700;0,900&family=Oswald:wght@500;700&display=swap');
         body, html { margin: 0; padding: 0; width: 1080px; height: 1080px; font-family: 'Montserrat', sans-serif; background-color: #161b22; display: flex; justify-content: center; align-items: center; overflow: hidden; }
         .instagram-post { width: 1080px; height: 1080px; position: relative; background: transparent; color: white; box-sizing: border-box; padding: 45px 60px 50px 60px; display: flex; flex-direction: column; justify-content: space-between; z-index: 1; }
-        .bg-image { position: absolute; top: -10%; left: -10%; width: 120%; height: 120%; background: url('IMG_URL') center/cover no-repeat; filter: blur(0.1px) brightness(0.6); z-index: -3; }
+        .bg-image { position: absolute; top: -10%; left: -10%; width: 120%; height: 120%; background: url('IMG_URL') center/cover no-repeat; filter: blur(0px) brightness(0.6); z-index: -3; }
         .header { display: flex; align-items: center; z-index: 2; }
         .logo-container { width: 150px; height: 150px; border-radius: 50%; overflow: hidden; border: 4px solid #3598db; box-shadow: 0 0 30px rgba(53, 152, 219, 0.4); background-color: #151a21; flex-shrink: 0; }
         .logo-container img { width: 100%; height: 100%; object-fit: contain; }
@@ -166,7 +177,7 @@ def resim_olustur(ai, gorsel):
             [div class='watermark']SAHA[/div]
             [div class='header']
                 [div class='logo-container']
-                    [img src='LOGO.jpeg' alt='Saha Ekrani Logo']
+                    [img src='LOGO_SRC' alt='Logo']
                 [/div]
                 [div class='header-text']
                     [h1 class='text-green']SAHA[/h1]
@@ -184,17 +195,15 @@ def resim_olustur(ai, gorsel):
 
     html_icerik = sablon.replace("[", "<").replace("]", ">")
     html_icerik = html_icerik.replace("IMG_URL", gorsel)
+    html_icerik = html_icerik.replace("LOGO_SRC", logo_src)
     html_icerik = html_icerik.replace("BASLIK", ai["baslik"])
     html_icerik = html_icerik.replace("OZET", ai["ozet"])
-
-    with open("gecici.html", "w", encoding="utf-8") as f:
-        f.write(html_icerik)
 
     yol = os.path.join(os.getcwd(), "santra_haber.jpg")
     with sync_playwright() as p:
         browser = p.chromium.launch(args=["--no-sandbox"])
         page = browser.new_page(viewport={"width": 1080, "height": 1080})
-        page.goto("file://" + os.path.abspath("gecici.html"), wait_until="networkidle")
+        page.set_content(html_icerik, wait_until="load")
         page.wait_for_timeout(2500)
         page.screenshot(path=yol, type="jpeg", quality=90)
         browser.close()
@@ -218,4 +227,4 @@ if __name__ == "__main__":
         resim = resim_olustur(ai_veri, h['gorsel'])
         aciklama = aciklama_kaydet(ai_veri)
         gecmiye_kaydet(h['baslik'], resim, aciklama)
-        print("---- ISLEM BITTI ----")
+        print("---- İŞLEM BİTTİ ----")
