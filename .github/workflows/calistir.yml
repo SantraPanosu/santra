@@ -34,11 +34,18 @@ jobs:
         run: |
           python -m playwright install chromium
 
-      - name: Run bot
+      - name: List repository files (debug)
+        run: |
+          echo "Working dir: $(pwd)"
+          ls -la
+
+      - name: Run haber_botu
         env:
           IG_USERNAME: ${{ secrets.IG_USERNAME }}
           IG_PASSWORD: ${{ secrets.IG_PASSWORD }}
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-        run: python bot.py
+        run: |
+          echo "Starting bot..."
+          python ./haber_botu.py
