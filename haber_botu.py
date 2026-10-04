@@ -1,4 +1,4 @@
-import os, random, re, json, subprocess, time, feedparser, urllib.request
+import os, random, re, json, subprocess, time, feedparser
 from groq import Groq
 from playwright.sync_api import sync_playwright
 
@@ -40,7 +40,7 @@ def gecmiye_kaydet(baslik, resim_yolu):
         if os.path.exists(resim_yolu): subprocess.run(["git", "add", resim_yolu], check=True)
         subprocess.run(["git", "commit", "-m", "Guncelleme [skip ci]"], check=True)
         subprocess.run(["git", "push"], check=True)
-    except Exception as e:
+    except Exception:
         pass
 
 def haberleri_cek():
@@ -54,40 +54,20 @@ def haberleri_cek():
                     gorsel = random.choice(YEDEK)
                     if 'media_content' in entry: gorsel = entry.media_content[0]['url']
                     haberler.append({'baslik': entry.title, 'metin': entry.get('description', ''), 'gorsel': gorsel})
-        except: pass
+        except Exception:
+            pass
     if not haberler: return None
     return random.choice(haberler)
 
-def aktif_modeli_bul():
-    print("Groq sunucusundan aktif modeller sorgulaniyor...")
-    try:
-        req = urllib.request.Request(
-            "https://api.groq.com/openai/v1/models",
-            headers={"Authorization": f"Bearer {GROQ_API_KEY}"}
-        )
-        with urllib.request.urlopen(req) as response:
-            data = json.loads(response.read().decode())
-            bulunanlar = [m["id"] for m in data.get("data", [])]
-            print(f"Erisilebilen modeller: {bulunanlar}")
-            for tercih in ["openai/gpt-oss-120b - on_demand", "openai/gpt-oss-120b - on_demand", "openai/gpt-oss-120b - on_demand", "gemma2-9b-it"]:
-                if tercih in bulunanlar:
-                    print(f"Secilen aktif model: {tercih}")
-                    return tercih
-            if bulunanlar:
-                return bulunanlar[0]
-    except Exception as e:
-        print(f"Model sorgulama uyarisi: {e}")
-    return "openai/gpt-oss-120b - on_demand"
-
 def ozgunlestir(haber):
     print("Yapay zeka devrede...")
-    prompt = "Su spor haberini incele ve SADECE JSON formatinda ver. Baska hicbir kelime yazma: {\"baslik\":\"kisa baslik\",\"ozet\":\"1 cumle\",\"aciklama\":\"kisa\",\"detayli_metin\":\"uzun text\"}. Haber: " + haber['baslik'] + " - " + haber['metin']
-    
-    secilen_model = aktif_modeli_bul()
+    prompt = 'Su spor haberini incele ve SADECE JSON formatinda ver. Baska hicbir kelime yazma: {"baslik":"kisa baslik","ozet":"1 cumle","aciklama":"kisa","detayli_metin":"uzun text"}. Haber: ' + haber['baslik'] + ' - ' + haber['metin']
     
     chat = client.chat.completions.create(
         messages=[{"role": "user", "content": prompt}],
-        model=secilen_model
+        model="openai/gpt-oss-120b",
+        max_completion_tokens=2048,
+        reasoning_effort="medium"
     )
     cevap = chat.choices[0].message.content
     
@@ -100,8 +80,14 @@ def ozgunlestir(haber):
     return json.loads(temiz_metin)
 
 def resim_olustur(ai, gorsel):
-    html_icerik = "<html><body style=\"background:url('" + gorsel + "');color:#fff;padding:50px\"><h1>" + ai["baslik"] + "</h1><h2>" + ai["ozet"] + "</h2><p>" + ai["aciklama"] + "</p></body></html>"
-    with open("gecici.html", "w", encoding="utf-8") as f: f.write(html_icerik)
+    html_icerik = "
+        " " + ai["baslik"] + " \n"
+        " " + ai["ozet"] + " \n"
+        " " + ai["aciklama"] + " \n"
+    )
+    with open("gecici.html", "w", encoding="utf-8") as f:
+        f.write(html_icerik)
+
     yol = os.path.join(os.getcwd(), "santra_haber.jpg")
     with sync_playwright() as p:
         browser = p.chromium.launch(args=["--no-sandbox"])
@@ -111,6 +97,7 @@ def resim_olustur(ai, gorsel):
         browser.close()
     return yol
 
+
 def instagram_yukle(resim, ai):
     caption = "🚨 " + ai['baslik'] + "\n\n" + ai['detayli_metin'] + "\n\n#Futbol #Spor #Transfer"
     with sync_playwright() as p:
@@ -118,24 +105,30 @@ def instagram_yukle(resim, ai):
         page = b.new_page()
         page.goto("https://www.instagram.com/accounts/login/")
         time.sleep(3)
+
         page.locator("input[name='username']").fill(IG_USERNAME)
         page.locator("input[name='password']").fill(IG_PASSWORD)
         page.locator("button[type='submit']").click()
         time.sleep(8)
+
         page.goto("https://www.instagram.com/create/style/")
         time.sleep(3)
         page.locator("input[type='file']").set_input_files(resim)
         time.sleep(3)
+
         for _ in range(2):
             try:
                 page.locator("button:has-text('İleri'), button:has-text('Next')").click()
                 time.sleep(2)
-            except: pass
+            except Exception:
+                pass
+
         page.locator("div[aria-label='Write a caption...'], textarea").fill(caption)
         time.sleep(2)
         page.locator("button:has-text('Paylaş'), button:has-text('Share')").click()
         time.sleep(8)
         b.close()
+
 
 if __name__ == "__main__":
     h = haberleri_cek()
@@ -144,5 +137,3 @@ if __name__ == "__main__":
         resim = resim_olustur(ai_veri, h['gorsel'])
         gecmiye_kaydet(h['baslik'], resim)
         instagram_yukle(resim, ai_veri)
-    else:
-        print("Yeni haber yok.")
