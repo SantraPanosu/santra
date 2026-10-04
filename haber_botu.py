@@ -135,9 +135,7 @@ def gecmiye_kaydet(baslik, resim_yolu, aciklama_yolu):
 
 
 def haberleri_cek():
-    print(
-        "Tum RSS siteleri tek tek taranıyor ve en yeniler filtreleniyor..."
-    )
+    print("Tum RSS siteleri tek tek taranıyor ve en yeniler filtreleniyor...")
 
     paylasilanlar = gecmisi_yukle()
     tum_adaylar = []
@@ -148,7 +146,7 @@ def haberleri_cek():
 
             for entry in feed.entries[:5]:
                 baslik = entry.title.strip()
-                aciklama = entry.get("description", "")
+                aciklama = entry.get('description', '')
 
                 metin_butun = (
                     baslik + " " + aciklama
@@ -162,39 +160,27 @@ def haberleri_cek():
                 if not yasakli_varmi and baslik not in paylasilanlar:
                     gorsel_url = None
 
-                    if (
-                        hasattr(entry, "media_content")
-                        and entry.media_content
-                    ):
-                        gorsel_url = entry.media_content[0].get("url")
+                    if hasattr(entry, 'media_content') and entry.media_content:
+                        gorsel_url = entry.media_content[0].get('url')
 
-                    elif (
-                        hasattr(entry, "media_thumbnail")
-                        and entry.media_thumbnail
-                    ):
-                        gorsel_url = entry.media_thumbnail[0].get("url")
+                    elif hasattr(entry, 'media_thumbnail') and entry.media_thumbnail:
+                        gorsel_url = entry.media_thumbnail[0].get('url')
 
-                    elif (
-                        hasattr(entry, "enclosures")
-                        and entry.enclosures
-                    ):
+                    elif hasattr(entry, 'enclosures') and entry.enclosures:
                         for enc in entry.enclosures:
-                            if "image" in enc.get("type", ""):
-                                gorsel_url = enc.get("href")
+                            if 'image' in enc.get('type', ''):
+                                gorsel_url = enc.get('href')
                                 break
 
                         if not gorsel_url and entry.enclosures:
-                            gorsel_url = entry.enclosures[0].get("href")
+                            gorsel_url = entry.enclosures[0].get('href')
 
                     if not gorsel_url:
                         html_text = aciklama
 
-                        if hasattr(entry, "content"):
+                        if hasattr(entry, 'content'):
                             for c in entry.content:
-                                html_text += " " + c.get(
-                                    "value",
-                                    ""
-                                )
+                                html_text += " " + c.get('value', '')
 
                         img_match = re.search(
                             r'src=["\'](https?://[^"\']+\.(?:jpg|jpeg|png|webp|avif))["\']',
@@ -208,53 +194,40 @@ def haberleri_cek():
                     if gorsel_url:
                         tum_adaylar.append(
                             {
-                                "baslik": baslik,
-                                "metin": aciklama,
-                                "gorsel": gorsel_url
+                                'baslik': baslik,
+                                'metin': aciklama,
+                                'gorsel': gorsel_url
                             }
                         )
 
         except Exception as e:
-            print(
-                f"RSS tarama hatasi ({rss}):",
-                e
-            )
+            print(f"RSS tarama hatasi ({rss}):", e)
             pass
 
     if not tum_adaylar:
-        print(
-            "UYARI: Paylasilmamis yeni haber bulunamadi!"
-        )
+        print("UYARI: Paylasilmamis yeni haber bulunamadi!")
         return None
 
     secilen = tum_adaylar[0]
 
     print(
         "SEÇİLEN EN YENİ VE BENZERSİZ HABER: "
-        + secilen["baslik"]
+        + secilen['baslik']
     )
 
     return secilen
 
 
 def ozgunlestir(haber):
-    print(
-        "Groq yapay zeka devrede (Kesin Gerçeklik Modu)..."
-    )
+    print("Groq yapay zeka devrede (Kesin Gerçeklik Modu)...")
 
     prompt = (
         "Sen profesyonel bir spor editörüsün. Aşağıdaki güncel haberi incele. "
         "KESİNLİKLE KAFANDAN YENİ BİRŞEY, UYDURMA TRANSFER VEYA RAKAM EKLEME. "
         "Sadece verilen kaynak metindeki gerçekleri baz alarak düzenle. "
         "SADECE JSON formatinda ver, baska hicbir kelime yazma: "
-        "{\"baslik\":\"orijinal baslik\","
-        "\"ozet\":\"1 cumlelik ozet\","
-        "\"aciklama\":\"kisa\","
-        "\"detayli_metin\":\"detay\"}. "
-        "Kaynak Başlık: "
-        + haber["baslik"]
-        + " | Kaynak Metin: "
-        + haber["metin"]
+        "{\"baslik\":\"orijinal baslik\",\"ozet\":\"1 cumlelik ozet\",\"aciklama\":\"kisa\",\"detayli_metin\":\"detay\"}. "
+        "Kaynak Başlık: " + haber['baslik'] + " | Kaynak Metin: " + haber['metin']
     )
 
     chat = client.chat.completions.create(
@@ -279,8 +252,8 @@ def ozgunlestir(haber):
     )
 
     match = re.search(
-        r"\{.*?\}",
-        temiz_metin.replace("\n", ""),
+        r'\{.*?\}',
+        temiz_metin.replace('\n', ''),
         re.IGNORECASE | re.DOTALL
     )
 
@@ -291,9 +264,7 @@ def ozgunlestir(haber):
 
 
 def resim_olustur(ai, gorsel):
-    print(
-        "SahaEkrani tasarimi kusursuz sekilde olusturuluyor..."
-    )
+    print("SahaEkrani tam ekran sablon tasarimi olusturuluyor...")
 
     logo_base64 = ""
 
@@ -301,7 +272,7 @@ def resim_olustur(ai, gorsel):
         with open("LOGO.jpeg", "rb") as f:
             logo_base64 = base64.b64encode(
                 f.read()
-            ).decode("utf-8")
+            ).decode('utf-8')
 
     logo_src = (
         f"data:image/jpeg;base64,{logo_base64}"
@@ -316,215 +287,14 @@ def resim_olustur(ai, gorsel):
     )
 
     sablon = """
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-<meta charset="UTF-8">
 
-<style>
 
-* {
-    box-sizing: border-box;
-}
 
-html,
-body {
-    margin: 0;
-    padding: 0;
 
-    width: 1080px;
-    height: 1080px;
 
-    overflow: hidden;
+BASLIK
+OZET
 
-    font-family:
-        Arial,
-        Helvetica,
-        sans-serif;
-
-    background: #080808;
-}
-
-.container {
-    position: relative;
-
-    width: 1080px;
-    height: 1080px;
-
-    overflow: hidden;
-
-    background:
-        linear-gradient(
-            180deg,
-            rgba(0,0,0,0.05) 0%,
-            rgba(0,0,0,0.20) 35%,
-            rgba(0,0,0,0.92) 100%
-        ),
-        url("SAFE_GORSEL");
-
-    background-size: cover;
-    background-position: center;
-}
-
-.overlay {
-    position: absolute;
-
-    inset: 0;
-
-    background:
-        linear-gradient(
-            180deg,
-            rgba(0,0,0,0.05) 0%,
-            rgba(0,0,0,0.15) 35%,
-            rgba(0,0,0,0.95) 100%
-        );
-}
-
-.top-bar {
-    position: absolute;
-
-    top: 40px;
-    left: 45px;
-    right: 45px;
-
-    display: flex;
-
-    align-items: center;
-
-    justify-content: space-between;
-}
-
-.logo {
-    max-width: 180px;
-    max-height: 90px;
-
-    object-fit: contain;
-}
-
-.breaking {
-    background: #e30613;
-
-    color: white;
-
-    font-size: 25px;
-
-    font-weight: 900;
-
-    padding: 13px 24px;
-
-    border-radius: 5px;
-
-    letter-spacing: 1px;
-
-    text-transform: uppercase;
-}
-
-.content {
-    position: absolute;
-
-    left: 55px;
-    right: 55px;
-    bottom: 60px;
-
-    color: white;
-}
-
-.line {
-    width: 90px;
-    height: 7px;
-
-    background: #e30613;
-
-    margin-bottom: 22px;
-}
-
-.title {
-    font-size: 58px;
-
-    line-height: 1.02;
-
-    font-weight: 900;
-
-    text-transform: uppercase;
-
-    text-shadow:
-        0 3px 10px rgba(0,0,0,0.8);
-
-    margin-bottom: 22px;
-}
-
-.summary {
-    font-size: 29px;
-
-    line-height: 1.25;
-
-    font-weight: 600;
-
-    color: #f1f1f1;
-
-    max-width: 930px;
-
-    text-shadow:
-        0 2px 7px rgba(0,0,0,0.9);
-}
-
-.brand {
-    margin-top: 28px;
-
-    font-size: 22px;
-
-    font-weight: 800;
-
-    color: #ffffff;
-
-    letter-spacing: 2px;
-}
-
-</style>
-
-</head>
-
-<body>
-
-<div class="container">
-
-    <div class="overlay"></div>
-
-    <div class="top-bar">
-
-        <img
-            class="logo"
-            src="LOGO_SRC"
-        >
-
-        <div class="breaking">
-            SON DAKİKA
-        </div>
-
-    </div>
-
-    <div class="content">
-
-        <div class="line"></div>
-
-        <div class="title">
-            BASLIK
-        </div>
-
-        <div class="summary">
-            OZET
-        </div>
-
-        <div class="brand">
-            SAHA EKRANI
-        </div>
-
-    </div>
-
-</div>
-
-</body>
-</html>
 """
 
     html_icerik = sablon.replace(
@@ -588,15 +358,13 @@ body {
 
 
 def aciklama_kaydet(ai):
-    print(
-        "Aciklama dosyasi hazirlaniyor..."
-    )
+    print("Aciklama dosyasi hazirlaniyor...")
 
     caption = (
         "🚨 "
-        + ai["baslik"]
+        + ai['baslik']
         + "\n\n"
-        + ai["detayli_metin"]
+        + ai['detayli_metin']
         + "\n\n"
         + "#SahaEkrani #Futbol #Spor #Transfer"
     )
@@ -617,9 +385,7 @@ def aciklama_kaydet(ai):
 
 
 if __name__ == "__main__":
-    print(
-        "---- SAHA EKRANI BOT BASLIYOR ----"
-    )
+    print("---- SAHA EKRANI BOT BASLIYOR ----")
 
     h = haberleri_cek()
 
@@ -628,7 +394,7 @@ if __name__ == "__main__":
 
         resim = resim_olustur(
             ai_veri,
-            h["gorsel"]
+            h['gorsel']
         )
 
         aciklama = aciklama_kaydet(
@@ -636,11 +402,9 @@ if __name__ == "__main__":
         )
 
         gecmiye_kaydet(
-            h["baslik"],
+            h['baslik'],
             resim,
             aciklama
         )
 
-        print(
-            "---- İŞLEM BİTTİ ----"
-        )
+        print("---- İŞLEM BİTTİ ----")
