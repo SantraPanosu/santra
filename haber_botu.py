@@ -25,23 +25,7 @@ RSS_KAYNAKLARI = [
 HAFIZA_DOSYASI = "paylasilanlar.json"
 
 # Yasaklı kelimeler filtresi (Bahis, iddaa, maç programı vb.)
-YASAKLI_KELIMELER = [
-    "misli",
-    "iddaa",
-    "bahis",
-    "kupon",
-    "oran",
-    "casino",
-    "slot",
-    "yatırım",
-    "bonus",
-    "günün maçları",
-    "hangi kanalda",
-    "saat kaçta",
-    "maç programı",
-    "haftanın maçları",
-    "yayın akışı"
-]
+YASAKLI_KELIMELER = ["misli", "iddaa", "bahis", "kupon", "oran", "casino", "slot", "yatırım", "bonus", "günün maçları", "hangi kanalda", "saat kaçta", "maç programı", "haftanın maçları", "yayın akışı"]
 
 
 def gecmisi_yukle():
@@ -56,7 +40,6 @@ def gecmisi_yukle():
 
 def gecmiye_kaydet(baslik, resim_yolu, aciklama_yolu):
     print("Hafiza ve dosyalar guncelleniyor...")
-
     paylasilanlar = gecmisi_yukle()
 
     if baslik not in paylasilanlar:
@@ -66,33 +49,16 @@ def gecmiye_kaydet(baslik, resim_yolu, aciklama_yolu):
         paylasilanlar = paylasilanlar[-200:]
 
     with open(HAFIZA_DOSYASI, "w", encoding="utf-8") as f:
-        json.dump(
-            paylasilanlar,
-            f,
-            ensure_ascii=False,
-            indent=4
-        )
+        json.dump(paylasilanlar, f, ensure_ascii=False, indent=4)
 
     try:
         subprocess.run(
-            [
-                "git",
-                "config",
-                "--global",
-                "user.name",
-                "SahaEkraniBot"
-            ],
+            ["git", "config", "--global", "user.name", "SahaEkraniBot"],
             check=True
         )
 
         subprocess.run(
-            [
-                "git",
-                "config",
-                "--global",
-                "user.email",
-                "bot@sahaekrani.com"
-            ],
+            ["git", "config", "--global", "user.email", "bot@sahaekrani.com"],
             check=True
         )
 
@@ -135,9 +101,7 @@ def gecmiye_kaydet(baslik, resim_yolu, aciklama_yolu):
 
 
 def haberleri_cek():
-    print(
-        "Tum RSS siteleri tek tek taranıyor ve en yeniler filtreleniyor..."
-    )
+    print("Tum RSS siteleri tek tek taranıyor ve en yeniler filtreleniyor...")
 
     paylasilanlar = gecmisi_yukle()
     tum_adaylar = []
@@ -150,9 +114,7 @@ def haberleri_cek():
                 baslik = entry.title.strip()
                 aciklama = entry.get('description', '')
 
-                metin_butun = (
-                    baslik + " " + aciklama
-                ).lower()
+                metin_butun = (baslik + " " + aciklama).lower()
 
                 yasakli_varmi = any(
                     kelime in metin_butun
@@ -162,22 +124,13 @@ def haberleri_cek():
                 if not yasakli_varmi and baslik not in paylasilanlar:
                     gorsel_url = None
 
-                    if (
-                        hasattr(entry, 'media_content')
-                        and entry.media_content
-                    ):
+                    if hasattr(entry, 'media_content') and entry.media_content:
                         gorsel_url = entry.media_content[0].get('url')
 
-                    elif (
-                        hasattr(entry, 'media_thumbnail')
-                        and entry.media_thumbnail
-                    ):
+                    elif hasattr(entry, 'media_thumbnail') and entry.media_thumbnail:
                         gorsel_url = entry.media_thumbnail[0].get('url')
 
-                    elif (
-                        hasattr(entry, 'enclosures')
-                        and entry.enclosures
-                    ):
+                    elif hasattr(entry, 'enclosures') and entry.enclosures:
                         for enc in entry.enclosures:
                             if 'image' in enc.get('type', ''):
                                 gorsel_url = enc.get('href')
@@ -212,16 +165,11 @@ def haberleri_cek():
                         )
 
         except Exception as e:
-            print(
-                f"RSS tarama hatasi ({rss}):",
-                e
-            )
+            print(f"RSS tarama hatasi ({rss}):", e)
             pass
 
     if not tum_adaylar:
-        print(
-            "UYARI: Paylasilmamis yeni haber bulunamadi!"
-        )
+        print("UYARI: Paylasilmamis yeni haber bulunamadi!")
         return None
 
     secilen = tum_adaylar[0]
@@ -235,9 +183,7 @@ def haberleri_cek():
 
 
 def ozgunlestir(haber):
-    print(
-        "Groq yapay zeka devrede (Kesin Gerçeklik Modu)..."
-    )
+    print("Groq yapay zeka devrede (Kesin Gerçeklik Modu)...")
 
     prompt = (
         "Sen profesyonel bir spor editörüsün. Aşağıdaki güncel haberi incele. "
@@ -245,10 +191,7 @@ def ozgunlestir(haber):
         "Sadece verilen kaynak metindeki gerçekleri baz alarak düzenle. "
         "SADECE JSON formatinda ver, baska hicbir kelime yazma: "
         "{\"baslik\":\"orijinal baslik\",\"ozet\":\"1 cumlelik ozet\",\"aciklama\":\"kisa\",\"detayli_metin\":\"detay\"}. "
-        "Kaynak Başlık: "
-        + haber['baslik']
-        + " | Kaynak Metin: "
-        + haber['metin']
+        "Kaynak Başlık: " + haber['baslik'] + " | Kaynak Metin: " + haber['metin']
     )
 
     chat = client.chat.completions.create(
@@ -314,6 +257,11 @@ def resim_olustur(ai, gorsel):
 
 
 SAHA
+
+SAHA
+
+
+EKRANI
 
 SON DAKİKA
 
