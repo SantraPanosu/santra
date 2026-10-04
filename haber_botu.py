@@ -45,7 +45,6 @@ YASAKLI_KELIMELER = [
     "bonus"
 ]
 
-
 def gecmisi_yukle():
     if os.path.exists(HAFIZA_DOSYASI):
         with open(HAFIZA_DOSYASI, "r", encoding="utf-8") as f:
@@ -54,7 +53,6 @@ def gecmisi_yukle():
             except:
                 return []
     return []
-
 
 def gecmiye_kaydet(baslik, resim_yolu, aciklama_yolu):
     print("Hafiza ve dosyalar guncelleniyor...")
@@ -132,7 +130,6 @@ def gecmiye_kaydet(baslik, resim_yolu, aciklama_yolu):
 
     except Exception as e:
         print("Git kayit uyarisi:", e)
-
 
 def haberleri_cek():
     print("Haberler taraniyor ve filtreleniyor...")
@@ -214,7 +211,6 @@ def haberleri_cek():
 
     return secilen
 
-
 def ozgunlestir(haber):
     print("Groq yapay zeka devrede...")
 
@@ -261,9 +257,8 @@ def ozgunlestir(haber):
 
     return json.loads(temiz_metin)
 
-
 def resim_olustur(ai, gorsel):
-    print("SahaEkrani tasarimi giydiriliyor...")
+    print("SahaEkrani tasarimi giydiriliyor (Net & Parlak Gorsel)...")
 
     sablon = """[html]
     [head]
@@ -304,7 +299,7 @@ def resim_olustur(ai, gorsel):
             width: 120%;
             height: 120%;
             background: url('IMG_URL') center/cover no-repeat;
-            filter: blur(5px) brightness(0.52);
+            filter: none;
             z-index: -3;
         }
 
@@ -531,7 +526,6 @@ def resim_olustur(ai, gorsel):
 
     return yol
 
-
 def aciklama_kaydet(ai):
     print("Aciklama dosyasi hazirlaniyor...")
 
@@ -557,7 +551,6 @@ def aciklama_kaydet(ai):
         f.write(caption)
 
     return yol
-
 
 if __name__ == "__main__":
     print("---- SAHA EKRANI BOT BASLIYOR ----")
