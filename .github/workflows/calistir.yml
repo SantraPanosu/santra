@@ -2,7 +2,7 @@ name: Instagram Auto Post
 
 on:
   schedule:
-    - cron: '0 */3 * * *'
+    - cron: '0 */3 * * *'   # her 3 saatte bir
   workflow_dispatch: {}
 
 jobs:
@@ -37,11 +37,15 @@ jobs:
         run: |
           python -m playwright install chromium
 
-      - name: Restore IG session from secret if provided
-        if: ${{ secrets.IG_SESSION_B64 != '' }}
+      - name: Restore IG session from secret (if provided)
         run: |
-          echo "Restoring IG session from secret..."
-          echo "${{ secrets.IG_SESSION_B64 }}" | base64 --decode > /tmp/ig_session.json
+          echo "Attempting to restore IG session from IG_SESSION_B64 secret (if set)..."
+          if [ -n "${{ secrets.IG_SESSION_B64 }}" ]; then
+            echo "${{ secrets.IG_SESSION_B64 }}" | base64 --decode > /tmp/ig_session.json
+            echo "IG session restored to /tmp/ig_session.json"
+          else
+            echo "IG_SESSION_B64 secret not set; skipping restore."
+          fi
         shell: bash
 
       - name: Download IG session artifact if exists
