@@ -1,4 +1,4 @@
-import os, random, re, json, subprocess, time, feedparser
+import os, random, re, json, subprocess, time, feedparser, difflib
 from groq import Groq
 from playwright.sync_api import sync_playwright
 
@@ -21,13 +21,6 @@ RSS_KAYNAKLARI = [
     "https://www.hurriyet.com.tr/rss/spor",
     "https://www.sabah.com.tr/rss/spor.xml",
     "https://www.yenisafak.com/rss/spor"
-]
-
-YEDEK_GORSELLER = [
-    "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=1080",
-    "https://images.unsplash.com/photo-1518605368461-1e1e12db801b?q=80&w=1080",
-    "https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=1080",
-    "https://images.unsplash.com/photo-1556056504-5c7696c4c28d?q=80&w=1080"
 ]
 
 HAFIZA_DOSYASI = "paylasilanlar.json"
@@ -60,8 +53,8 @@ def gecmiye_kaydet(baslik, resim_yolu, aciklama_yolu):
     paylasilanlar = gecmisi_yukle()
     paylasilanlar.append(baslik)
 
-    if len(paylasilanlar) > 150:
-        paylasilanlar = paylasilanlar[-150:]
+    if len(paylasilanlar) > 200:
+        paylasilanlar = paylasilanlar[-200:]
 
     with open(HAFIZA_DOSYASI, "w", encoding="utf-8") as f:
         json.dump(
@@ -131,8 +124,16 @@ def gecmiye_kaydet(baslik, resim_yolu, aciklama_yolu):
     except Exception as e:
         print("Git kayit uyarisi:", e)
 
+# FARKLI SİTELERDEKİ AYNI/BENZER HABERLERİ YAKALAMA FONKSİYONU
+def benzer_mi(yeni_baslik, gecmis_listesi):
+    for eski in gecmis_listesi:
+        # Kelime benzerliği %55'ten fazlaysa aynı haber say ve atla
+        if difflib.SequenceMatcher(None, yeni_baslik.lower(), eski.lower()).ratio() > 0.55:
+            return True
+    return False
+
 def haberleri_cek():
-    print("Haberler taraniyor ve filtreleniyor...")
+    print("Haberler taraniyor, resimsiz ve kopya olanlar eleniyor...")
 
     paylasilanlar = gecmisi_yukle()
     haberler = []
@@ -141,14 +142,14 @@ def haberleri_cek():
         try:
             feed = feedparser.parse(rss)
 
-            for entry in feed.entries[:5]:
-                baslik = entry.title
+            for entry in feed.entries[:8]:
+                baslik = entry.title.strip()
                 aciklama = entry.get(
                     'description',
                     ''
                 )
 
-                # Yasaklı kelime kontrolü (Bahis / Misli vb.)
+                # Yasaklı kelime kontrolü
                 metin_butun = (
                     baslik
                     + " "
@@ -160,52 +161,66 @@ def haberleri_cek():
                     for kelime in YASAKLI_KELIMELER
                 )
 
-                if not yasakli_varmi and baslik not in paylasilanlar:
+                if yasakli_varmi:
+                    continue
 
-                    gorsel_url = random.choice(
-                        YEDEK_GORSELLER
+                # KOPYA HABER KONTROLÜ (Başka siteden aynı haberi alma)
+                if benzer_mi(baslik, paylasilanlar):
+                    continue
+
+                gorsel_url = None
+
+                # GÖRSEL BULMA
+                if hasattr(entry, 'media_content') and entry.media_content:
+                    gorsel_url = entry.media_content[0].get('url')
+                elif hasattr(entry, 'media_thumbnail') and entry.media_thumbnail:
+                    gorsel_url = entry.media_thumbnail[0].get('url')
+                elif hasattr(entry, 'enclosures') and entry.enclosures:
+                    for enc in entry.enclosures:
+                        if 'image' in enc.get('type', ''):
+                            gorsel_url = enc.get('href')
+                            break
+                    if not gorsel_url and entry.enclosures:
+                        gorsel_url = entry.enclosures[0].get('href')
+
+                if not gorsel_url:
+                    html_text = aciklama
+                    if hasattr(entry, 'content'):
+                        for c in entry.content:
+                            html_text += " " + c.get('value', '')
+                    img_match = re.search(
+                        r'src=["\'](https?://[^"\']+\.(?:jpg|jpeg|png|webp|avif))["\']',
+                        html_text,
+                        re.IGNORECASE
                     )
+                    if img_match:
+                        gorsel_url = img_match.group(1)
 
-                    if 'media_content' in entry:
-                        gorsel_url = entry.media_content[0]['url']
+                # RESİMSİZ HABER İPTALİ (Orijinal resmi yoksa listeye KESİNLİKLE ekleme)
+                if not gorsel_url:
+                    continue
 
-                    elif (
-                        'enclosures' in entry
-                        and len(entry.enclosures) > 0
-                    ):
-                        gorsel_url = entry.enclosures[0]['href']
-
-                    if gorsel_url in YEDEK_GORSELLER:
-                        img_match = re.search(
-                            r'src=["\'](https?://[^"\']+\.(?:jpg|jpeg|png|webp))["\']',
-                            aciklama,
-                            re.IGNORECASE
-                        )
-
-                        if img_match:
-                            gorsel_url = img_match.group(1)
-
-                    haberler.append(
-                        {
-                            'baslik': baslik,
-                            'metin': aciklama,
-                            'gorsel': gorsel_url
-                        }
-                    )
+                haberler.append(
+                    {
+                        'baslik': baslik,
+                        'metin': aciklama,
+                        'gorsel': gorsel_url
+                    }
+                )
 
         except Exception:
             pass
 
     if not haberler:
         print(
-            "UYARI: Paylasilacak uygun haber bulunamadi!"
+            "UYARI: Paylasilacak, resimli, yeni ve uygun haber bulunamadi!"
         )
         return None
 
     secilen = random.choice(haberler)
 
     print(
-        "SECILEN TEMIZ HABER: "
+        "SECILEN TEMIZ VE RESIMLI HABER: "
         + secilen['baslik']
     )
 
@@ -258,7 +273,7 @@ def ozgunlestir(haber):
     return json.loads(temiz_metin)
 
 def resim_olustur(ai, gorsel):
-    print("SahaEkrani tasarimi giydiriliyor (Net & Keskin Sığdırılmış Görsel)...")
+    print("SahaEkrani tasarimi giydiriliyor (Tam Sığdırılmış, Parlak ve Net Görsel)...")
 
     sablon = """[html]
     [head]
@@ -298,8 +313,7 @@ def resim_olustur(ai, gorsel):
             left: 0;
             width: 100%;
             height: 100%;
-            background: url('IMG_URL') center/contain no-repeat;
-            background-color: #161b22;
+            background: url('IMG_URL') center/cover no-repeat;
             image-rendering: -webkit-optimize-contrast;
             filter: none;
             z-index: -3;
