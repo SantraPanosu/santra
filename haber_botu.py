@@ -25,13 +25,19 @@ RSS_KAYNAKLARI = [
 
 HAFIZA_DOSYASI = "paylasilanlar.json"
 
-# Yasaklı kelimeler filtresi (Bahis, iddaa, maç saatleri, tv rehberi vb.)
-# "Canlı" ve "İzle" kelimeleri tek başlarına eklenerek filtreleme güçlendirildi.
+# Yasaklı kelimeler filtresi (Güçlendirildi ve detaylandırıldı)
 YASAKLI_KELIMELER = [
-    "canlı", "izle", "misli", "iddaa", "bahis", "kupon", "oran", "casino", "slot", "yatırım", "bonus",
-    "hangi kanalda", "saat kaçta", "şifresiz", "canlı yayın", "canlı izle", 
-    "yayınlanacak", "naklen", "ekranlarında", "yayın akışı", "maç programı"
+    "canlı izle", "canli izle", "canlı yayın", "canli yayin", "canlı anlatım",
+    "şifresiz", "sifresiz", "hangi kanalda", "saat kaçta", "saat kacta",
+    "yayın akışı", "yayin akisi", "maç programı", "mac programi",
+    "muhtemel 11", "muhtemel onbir", "tv'de bugün",
+    "misli", "iddaa", "bahis", "kupon", "oran", "casino", "slot", "yatırım", "bonus"
 ]
+
+def tr_lower(text):
+    # Türkçe karakterlerin doğru küçültülmesi için özel fonksiyon
+    text = text.replace('I', 'ı').replace('İ', 'i')
+    return text.lower()
 
 def gecmisi_yukle():
     if os.path.exists(HAFIZA_DOSYASI):
@@ -46,7 +52,8 @@ def gecmiye_kaydet(baslik, resim_yolu, aciklama_yolu):
     print("Hafiza ve dosyalar guncelleniyor...")
 
     paylasilanlar = gecmisi_yukle()
-    paylasilanlar.append(baslik)
+    if baslik not in paylasilanlar:
+        paylasilanlar.append(baslik)
 
     if len(paylasilanlar) > 200:
         paylasilanlar = paylasilanlar[-200:]
@@ -123,7 +130,7 @@ def gecmiye_kaydet(baslik, resim_yolu, aciklama_yolu):
 def benzer_mi(yeni_baslik, gecmis_listesi):
     for eski in gecmis_listesi:
         # Kelime benzerliği %55'ten fazlaysa aynı haber say ve atla
-        if difflib.SequenceMatcher(None, yeni_baslik.lower(), eski.lower()).ratio() > 0.55:
+        if difflib.SequenceMatcher(None, tr_lower(yeni_baslik), tr_lower(eski)).ratio() > 0.55:
             return True
     return False
 
@@ -133,12 +140,16 @@ def haberleri_cek():
     paylasilanlar = gecmisi_yukle()
     haberler = []
     su_an = time.time()
+    
+    # Hep aynı siteden haber almaması için kaynakları karıştır
+    random.shuffle(RSS_KAYNAKLARI)
 
     for rss in RSS_KAYNAKLARI:
         try:
             feed = feedparser.parse(rss)
 
-            for entry in feed.entries[:8]:
+            # Arama havuzunu 8'den 15'e çıkardık ki tıkanma yapmasın
+            for entry in feed.entries[:15]:
                 # ZAMAN KONTROLÜ (En fazla 13 saatlik haberler alınır)
                 if hasattr(entry, 'published_parsed') and entry.published_parsed:
                     yayin_zamani = calendar.timegm(entry.published_parsed)
@@ -155,12 +166,8 @@ def haberleri_cek():
                     ''
                 )
 
-                # Yasaklı kelime kontrolü
-                metin_butun = (
-                    baslik
-                    + " "
-                    + aciklama
-                ).lower()
+                # Yasaklı kelime kontrolü (Özel Türkçe lower fonksiyonu ile)
+                metin_butun = tr_lower(baslik + " " + aciklama)
 
                 yasakli_varmi = any(
                     kelime in metin_butun
@@ -224,7 +231,7 @@ def haberleri_cek():
         return None
 
     # GİZLİ TAKIM ÖNCELİĞİ (Beşiktaş haberi varsa ilk onu seçer)
-    ozel_liste = [h for h in haberler if "beşiktaş" in h['baslik'].lower() or "besiktas" in h['baslik'].lower()]
+    ozel_liste = [h for h in haberler if "beşiktaş" in tr_lower(h['baslik']) or "besiktas" in tr_lower(h['baslik'])]
     
     if ozel_liste:
         secilen = random.choice(ozel_liste)
@@ -241,8 +248,7 @@ def haberleri_cek():
 def ozgunlestir(haber):
     print("Groq yapay zeka devrede (Katı Gerçeklik Modu - Başlık Koruma)...")
 
-    # Prompt değiştirilerek yapay zekadan başlık özgünleştirmesi istenmiyor.
-    # Sadece özet ve detaylı metin istenir.
+    # Yapay zekadan başlık özgünleştirmesi istenmiyor. Sadece özet ve detaylı metin istenir.
     prompt = (
         "Sen profesyonel ve kesinlikle yalan/uydurma haber yapmayan bir spor editörüsün. "
         "Aşağıdaki haberi incele. KESİNLİKLE kafandan eski teknik direktör, uydurma transfer, yalan bilgi veya rakam EKLEME. "
