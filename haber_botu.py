@@ -35,18 +35,15 @@ YASAKLI_KELIMELER = ["misli", "iddaa", "bahis", "kupon", "oran", "casino", "slot
 def gecmisi_yukle():
     if os.path.exists(HAFIZA_DOSYASI):
         with open(HAFIZA_DOSYASI, "r", encoding="utf-8") as f:
-            try:
-                return json.load(f)
-            except:
-                return []
+            try: return json.load(f)
+            except: return []
     return []
 
 def gecmiye_kaydet(baslik, resim_yolu, aciklama_yolu):
     print("Hafiza ve dosyalar guncelleniyor...")
     paylasilanlar = gecmisi_yukle()
     paylasilanlar.append(baslik)
-    if len(paylasilanlar) > 150:
-        paylasilanlar = paylasilanlar[-150:]
+    if len(paylasilanlar) > 150: paylasilanlar = paylasilanlar[-150:]
     with open(HAFIZA_DOSYASI, "w", encoding="utf-8") as f:
         json.dump(paylasilanlar, f, ensure_ascii=False, indent=4)
     
@@ -54,10 +51,8 @@ def gecmiye_kaydet(baslik, resim_yolu, aciklama_yolu):
         subprocess.run(["git", "config", "--global", "user.name", "SahaEkraniBot"], check=True)
         subprocess.run(["git", "config", "--global", "user.email", "bot@sahaekrani.com"], check=True)
         subprocess.run(["git", "add", HAFIZA_DOSYASI], check=True)
-        if os.path.exists(resim_yolu):
-            subprocess.run(["git", "add", resim_yolu], check=True)
-        if os.path.exists(aciklama_yolu):
-            subprocess.run(["git", "add", aciklama_yolu], check=True)
+        if os.path.exists(resim_yolu): subprocess.run(["git", "add", resim_yolu], check=True)
+        if os.path.exists(aciklama_yolu): subprocess.run(["git", "add", aciklama_yolu], check=True)
         subprocess.run(["git", "commit", "-m", "Yeni gercek spor haberi hazirlandi (SahaEkrani) [skip ci]"], check=True)
         subprocess.run(["git", "push"], check=True)
         print("Tum dosyalar GitHub'a kaydedildi!")
@@ -88,8 +83,7 @@ def haberleri_cek():
                     
                     if gorsel_url in YEDEK_GORSELLER:
                         img_match = re.search(r'src=["\'](https?://[^"\']+\.(?:jpg|jpeg|png|webp))["\']', aciklama, re.IGNORECASE)
-                        if img_match:
-                            gorsel_url = img_match.group(1)
+                        if img_match: gorsel_url = img_match.group(1)
                     
                     haberler.append({'baslik': baslik, 'metin': aciklama, 'gorsel': gorsel_url})
         except Exception:
@@ -125,8 +119,7 @@ def ozgunlestir(haber):
     temiz_metin = cevap.replace("```json", "").replace("```", "").strip()
     
     match = re.search(r'\{.*?\}', temiz_metin.replace('\n', ''), re.IGNORECASE | re.DOTALL)
-    if match:
-        temiz_metin = match.group(0)
+    if match: temiz_metin = match.group(0)
         
     return json.loads(temiz_metin)
 
@@ -140,31 +133,56 @@ def resim_olustur(ai, gorsel):
     logo_src = f"data:image/jpeg;base64,{logo_base64}" if logo_base64 else ""
 
     html_content = """
-    <html>
-    <body>
-        <h1>SahaEkranı</h1>
-        <h2>SON DAKİKA</h2>
-        <h3>BASLIK_PLACEHOLDER</h3>
-        <p>OZET_PLACEHOLDER</p>
-    </body>
-    </html>
-    """
 
-    html_content = html_content.replace("BASLIK_PLACEHOLDER", ai["baslik"])
-    html_content = html_content.replace("OZET_PLACEHOLDER", ai["ozet"])
 
-    yol = os.path.join(os.getcwd(), "santra_haber.jpg")
-    with sync_playwright() as p:
-        browser = p.chromium.launch(args=["--no-sandbox"])
-        page = browser.new_page(viewport={"width": 1080, "height": 1080})
-        page.set_content(html_content)
-        page.wait_for_timeout(2500)
-        page.screenshot(path=yol, type="jpeg", quality=90)
-        browser.close()
+    
+    SahaEkranı
+    
 
-    print("SahaEkrani gorseli olusturuldu:", yol)
-    return yol
+SAHA
+
+SAHA
+EKRANI
+SON DAKİKA
+
+BASLIK_PLACEHOLDER
+OZET_PLACEHOLDER
+
+"""
+
+html_content = html_content.replace("IMG_URL_PLACEHOLDER", gorsel)
+html_content = html_content.replace("LOGO_SRC_PLACEHOLDER", logo_src)
+html_content = html_content.replace("BASLIK_PLACEHOLDER", ai["baslik"])
+html_content = html_content.replace("OZET_PLACEHOLDER", ai["ozet"])
+
+yol = os.path.join(os.getcwd(), "santra_haber.jpg")
+with sync_playwright() as p:
+    browser = p.chromium.launch(args=["--no-sandbox"])
+    page = browser.new_page(viewport={"width": 1080, "height": 1080})
+    page.set_content(html_content)
+    page.wait_for_timeout(2500)
+    page.screenshot(path=yol, type="jpeg", quality=90)
+    browser.close()
+
+print("SahaEkrani gorseli olusturuldu:", yol)
+return yol
+
 
 def aciklama_kaydet(ai):
     print("Aciklama dosyasi hazirlaniyor...")
-    caption = "🚨 " + ai['baslik'] + "\n\n" + ai['detayli_metin'] + "\n\n#SahaEkrani #Futbol #S
+    caption = "🚨 " + ai['baslik'] + "\n\n" + ai['detayli_metin'] + "\n\n#SahaEkrani #Futbol #Spor #Transfer"
+    yol = os.path.join(os.getcwd(), "aciklama.txt")
+    with open(yol, "w", encoding="utf-8") as f:
+        f.write(caption)
+    return yol
+
+
+if __name__ == "__main__":
+    print("---- SAHA EKRANI BOT BASLIYOR ----")
+    h = haberleri_cek()
+    if h:
+        ai_veri = ozgunlestir(h)
+        resim = resim_olustur(ai_veri, h['gorsel'])
+        aciklama = aciklama_kaydet(ai_veri)
+        gecmiye_kaydet(h['baslik'], resim, aciklama)
+    print("---- ISLEM BITTI ----")
