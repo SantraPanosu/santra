@@ -132,31 +132,25 @@ def ozgunlestir(haber):
 
 def resim_olustur(ai, gorsel):
     print("SahaEkrani tasarimi giydiriliyor...")
-    sablon = """
+    
+    html_icerik = f"""
     <html>
     <body>
         <h1>SAHA</h1>
         <h2>SAHA EKRANI</h2>
         <h3>SON DAKİKA</h3>
-        <h4>BASLIK</h4>
-        <p>OZET</p>
+        <h4>{ai["baslik"]}</h4>
+        <p>{ai["ozet"]}</p>
     </body>
     </html>
     """
-
-    html_icerik = sablon.replace("IMG_URL", gorsel)
-    html_icerik = html_icerik.replace("BASLIK", ai["baslik"])
-    html_icerik = html_icerik.replace("OZET", ai["ozet"])
-
-    with open("gecici.html", "w", encoding="utf-8") as f:
-        f.write(html_icerik)
 
     yol = os.path.join(os.getcwd(), "santra_haber.jpg")
     with sync_playwright() as p:
         browser = p.chromium.launch(args=["--no-sandbox"])
         page = browser.new_page(viewport={"width": 1080, "height": 1080})
-        page.goto("file://" + os.path.abspath("gecici.html"), wait_until="networkidle")
-        page.wait_for_timeout(2500)
+        page.set_content(html_icerik, wait_until="load")
+        page.wait_for_timeout(1500)
         page.screenshot(path=yol, type="jpeg", quality=90)
         browser.close()
 
